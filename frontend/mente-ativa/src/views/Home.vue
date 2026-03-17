@@ -12,6 +12,10 @@ const irParaTeste = () => {
 const irParaLogin = () => {
   router.push('/login')
 }
+
+const irParaCadastro = () => {
+  router.push('/cadastro')
+}
 </script>
 
 <template>
@@ -34,6 +38,10 @@ const irParaLogin = () => {
             <button @click="irParaLogin" class="bg-slate-100 px-6 py-2.5 rounded-full hover:bg-slate-200 transition-all font-bold text-slate-800 focus:ring-2 focus:ring-slate-400 outline-none">
               Login
             </button>
+            <button @click="irParaCadastro" class="bg-emerald-600 text-white px-6 py-2.5 rounded-full hover:bg-emerald-700 transition-all font-bold focus:ring-2 focus:ring-emerald-500 outline-none">
+              Cadastro
+            </button>
+
           </div>
 
         </div>

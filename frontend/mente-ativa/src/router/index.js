@@ -11,6 +11,11 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue') 
+  },
+  {
+    path: '/cadastro',
+    name: 'Cadastro',
+    component: () => import('../views/Cadastro.vue')
   }
   // Futuramente colocaremos a rota '/teste' e '/login' aqui!
 ]
