@@ -6,6 +6,11 @@ const routes = [
     path: '/',
     name: 'Home',
     component: Home
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue') 
   }
   // Futuramente colocaremos a rota '/teste' e '/login' aqui!
 ]

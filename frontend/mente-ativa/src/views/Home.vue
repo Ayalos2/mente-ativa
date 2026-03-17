@@ -9,7 +9,7 @@ const irParaTeste = () => {
   router.push('/teste/instrucoes')
 }
 
-const irParaPainelMedico = () => {
+const irParaLogin = () => {
   router.push('/login')
 }
 </script>
@@ -31,11 +31,8 @@ const irParaPainelMedico = () => {
           <div class="hidden md:flex items-center gap-8 text-base font-medium text-slate-600">
             <a href="#metodologia" class="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">Metodologia</a>
             <a href="#recursos" class="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">Recursos</a>
-            <button @click="irParaPaciente" class="bg-slate-100 px-6 py-2.5 rounded-full hover:bg-slate-200 transition-all font-bold text-slate-800 focus:ring-2 focus:ring-slate-400 outline-none">
-              Acesso Paciente
-            </button>
-            <button @click="irParaPainelMedico" class="bg-slate-100 px-6 py-2.5 rounded-full hover:bg-slate-200 transition-all font-bold text-slate-800 focus:ring-2 focus:ring-slate-400 outline-none">
-              Acesso Médico
+            <button @click="irParaLogin" class="bg-slate-100 px-6 py-2.5 rounded-full hover:bg-slate-200 transition-all font-bold text-slate-800 focus:ring-2 focus:ring-slate-400 outline-none">
+              Login
             </button>
           </div>
 
