@@ -77,6 +77,12 @@ const realizarCadastro = async () => {
             </select>
           </div>
 
+          <div class="sm:col-span-2" v-if="cargo === 'especialista'">
+            <label class="block text-sm font-semibold text-slate-700">CRM/CRP</label>
+            <input v-model="crmcrp" type="text" required placeholder="CRM/CRP" 
+              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
+          </div>
+
           <div>
             <label class="block text-sm font-semibold text-slate-700">Senha</label>
             <input v-model="senha" type="password" required placeholder="••••••••" 
