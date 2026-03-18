@@ -6,6 +6,21 @@ from .database import engine, Base, get_db
 
 app = FastAPI(title="Mente Ativa API")
 
+# Modelo de dados para receber o login
+class LoginSchema(BaseModel):
+    email: str
+    senha: str
+
+@app.post("/login")
+def login(dados: LoginSchema, db: Session = Depends(get_db)):
+    # Busca o usuário no banco
+    usuario = db.execute(text(f"SELECT * FROM usuarios WHERE email = '{dados.email}' AND senha = '{dados.senha}'")).fetchone()
+    
+    if usuario:
+        return {"status": "sucesso", "usuario": usuario.nome}
+    else:
+        return {"status": "erro", "mensagem": "E-mail ou senha incorretos"}
+
 
 @app.on_event("startup")
 def init_database():

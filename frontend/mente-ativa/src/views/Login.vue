@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
+
 
 const router = useRouter()
 const email = ref('')
@@ -9,11 +11,23 @@ const carregando = ref(false)
 
 const realizarLogin = async () => {
   carregando.value = true
-  // Aqui futuramente conectaremos com o seu Backend/Supabase Auth
-  setTimeout(() => {
+  try {
+    const resposta = await axios.post('http://localhost:8000/login', {
+      email: email.value,
+      senha: senha.value
+    })
+
+    if (resposta.data.status === 'sucesso') {
+      alert('Bem-vindo, ' + resposta.data.usuario)
+      router.push('/pacientes') // Vai para a lista de pacientes
+    } else {
+      alert(resposta.data.mensagem)
+    }
+  } catch (error) {
+    alert('Erro ao conectar com o servidor. Verifique se o backend está rodando!')
+  } finally {
     carregando.value = false
-    router.push('/pacientes') // Redireciona após o login
-  }, 1500)
+  }
 }
 </script>
 
