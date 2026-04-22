@@ -1,4 +1,4 @@
-<script setup>
+ <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
@@ -41,13 +41,24 @@ const lidarComSucessoGoogle = async (resultado) => {
     })
 
     if (resposta.data.status === 'sucesso') {
-      alert('Bem-vindo, ' + resposta.data.usuario)
-      router.push('/')
+      // Salva dados do usuário no sessionStorage
+      const userProfile = {
+        email: resposta.data.email,
+        nome: resposta.data.usuario,
+        provedor: resposta.data.provedor,
+        uid: resultado.user.uid,
+        foto: resultado.user.foto
+      }
+      sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+      
+      // Redireciona para a página de perfil
+      router.push('/profile')
       return
     }
     alert(resposta.data.mensagem || 'Nao foi possivel entrar com Google.')
   } catch (error) {
-    alert('Falha no login Google. Verifique a configuracao do Firebase e do backend.')
+    const detalheBackend = error?.response?.data?.detail
+    alert(detalheBackend || 'Falha no login Google. Verifique a configuracao do Firebase e do backend.')
   }
 }
 

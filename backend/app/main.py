@@ -53,14 +53,19 @@ def login_google(dados: GoogleLoginSchema, db: Session = Depends(get_db)):
     if not email:
         raise HTTPException(status_code=400, detail="Token Google sem e-mail")
 
-    usuario = db.execute(
-        text("SELECT nome FROM usuarios WHERE email = :email"),
-        {"email": email},
-    ).fetchone()
-
-    if usuario:
-        nome_usuario = usuario.nome
-    else:
+    # Tenta buscar usuário no banco, mas não falha se banco não estiver disponível
+    nome_usuario = nome
+    try:
+        usuario = db.execute(
+            text("SELECT nome FROM usuarios WHERE email = :email"),
+            {"email": email},
+        ).fetchone()
+        
+        if usuario:
+            nome_usuario = usuario.nome
+    except Exception as exc:
+        # Se banco falhar, usa o nome do token Firebase
+        print(f"Aviso: Não foi possível acessar banco de dados. Usando dados do Firebase: {exc}")
         nome_usuario = nome
 
     return {
