@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
 
 
 const router = useRouter()
@@ -9,17 +10,19 @@ const email = ref('')
 const senha = ref('')
 const carregando = ref(false)
 
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 const realizarLogin = async () => {
   carregando.value = true
   try {
-    const resposta = await axios.post('http://localhost:8000/login', {
+    const resposta = await axios.post(`${apiBaseUrl}/login`, {
       email: email.value,
       senha: senha.value
     })
 
     if (resposta.data.status === 'sucesso') {
       alert('Bem-vindo, ' + resposta.data.usuario)
-      router.push('/pacientes') // Vai para a lista de pacientes
+      router.push('/')
     } else {
       alert(resposta.data.mensagem)
     }
@@ -29,6 +32,25 @@ const realizarLogin = async () => {
     carregando.value = false
   }
 }
+
+const lidarComSucessoGoogle = async (resultado) => {
+  try {
+    const resposta = await axios.post(`${apiBaseUrl}/auth/google`, {
+      credential: resultado.token,
+      user: resultado.user,
+    })
+
+    if (resposta.data.status === 'sucesso') {
+      alert('Bem-vindo, ' + resposta.data.usuario)
+      router.push('/')
+      return
+    }
+    alert(resposta.data.mensagem || 'Nao foi possivel entrar com Google.')
+  } catch (error) {
+    alert('Falha no login Google. Verifique a configuracao do Firebase e do backend.')
+  }
+}
+
 </script>
 
 <template>
@@ -103,6 +125,19 @@ const realizarLogin = async () => {
             </button>
           </div>
         </form>
+
+        <div class="my-6 relative">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-slate-200"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-2 bg-white text-slate-500 font-medium">ou continue com</span>
+          </div>
+        </div>
+
+        <div class="flex justify-center">
+          <GoogleLoginButton @success="lidarComSucessoGoogle" @error="() => alert('Falha no login Google. Verifique a configuracao do Firebase.')" />
+        </div>
 
         <div class="mt-6">
           <div class="relative">
