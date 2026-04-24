@@ -6,7 +6,7 @@ const router = useRouter()
 
 // Funções de navegação para os botões principais
 const irParaTeste = () => {
-  router.push('/teste/instrucoes')
+  router.push('/teste/memorias')
 }
 
 const irParaLogin = () => {

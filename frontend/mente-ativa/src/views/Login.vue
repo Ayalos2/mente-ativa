@@ -1,11 +1,13 @@
  <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
 
 
 const router = useRouter()
+const route = useRoute()
 const email = ref('')
 const senha = ref('')
 const carregando = ref(false)
@@ -21,8 +23,16 @@ const realizarLogin = async () => {
     })
 
     if (resposta.data.status === 'sucesso') {
-      alert('Bem-vindo, ' + resposta.data.usuario)
-      router.push('/')
+      const userProfile = {
+        email: email.value,
+        nome: resposta.data.usuario || email.value,
+        provedor: 'email',
+      }
+
+      sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+
+      alert('Bem-vindo, ' + (resposta.data.usuario || email.value))
+      router.push(route.query.redirect || '/profile')
     } else {
       alert(resposta.data.mensagem)
     }
@@ -51,8 +61,8 @@ const lidarComSucessoGoogle = async (resultado) => {
       }
       sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
       
-      // Redireciona para a página de perfil
-      router.push('/profile')
+      // Redireciona para o destino protegido requisitado, quando existir
+      router.push(route.query.redirect || '/profile')
       return
     }
     alert(resposta.data.mensagem || 'Nao foi possivel entrar com Google.')

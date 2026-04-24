@@ -1,6 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 
+const isUsuarioAutenticado = () => {
+  const rawProfile = sessionStorage.getItem('userProfile')
+
+  if (!rawProfile) {
+    return false
+  }
+
+  try {
+    const profile = JSON.parse(rawProfile)
+    return Boolean(profile?.email || profile?.uid || profile?.nome)
+  } catch {
+    return false
+  }
+}
+
 const routes = [
   {
     path: '/',
@@ -20,7 +35,20 @@ const routes = [
   {
     path: '/profile',
     name: 'Profile',
-    component: () => import('../views/Profile.vue')
+    component: () => import('../views/Profile.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/privacy-security',
+    name: 'PrivacySecurity',
+    component: () => import('../views/PrivacySecurity.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/teste/memorias',
+    name: 'TesteMemorias',
+    component: () => import('../views/TesteMemorias.vue'),
+    meta: { requiresAuth: true }
   }
   // Futuramente colocaremos a rota '/teste' e '/login' aqui!
 ]
@@ -28,6 +56,21 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to) => {
+  if (!to.meta.requiresAuth) {
+    return true
+  }
+
+  if (isUsuarioAutenticado()) {
+    return true
+  }
+
+  return {
+    path: '/login',
+    query: { redirect: to.fullPath }
+  }
 })
 
 export default router

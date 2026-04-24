@@ -34,7 +34,11 @@ const handleLogout = async () => {
 }
 
 const iniciarNovoTeste = () => {
-  router.push('/teste/instrucoes')
+  router.push('/teste/memorias')
+}
+
+const abrirPrivacidadeSeguranca = () => {
+  router.push('/profile/privacy-security')
 }
 </script>
 
@@ -181,7 +185,10 @@ const iniciarNovoTeste = () => {
               <span class="text-xl">→</span>
             </div>
 
-            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer">
+            <div
+              class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+              @click="abrirPrivacidadeSeguranca"
+            >
               <div>
                 <p class="font-medium text-slate-900">Privacidade e Segurança</p>
                 <p class="text-sm text-slate-600">Controle sua privacidade de dados</p>
