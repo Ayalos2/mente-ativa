@@ -1,27 +1,19 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAasc6n9L6rlrb1q7oQ7fBYFgd2JE31zeo',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'mente-ativa-827bd.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'mente-ativa-827bd',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'mente-ativa-827bd.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '207875687436',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:207875687436:web:a8f3f01c3f28ea80f75a29',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-87J8Y0P00R',
 }
 
-const firebaseEnvKeys = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_APP_ID',
-]
+const app = initializeApp(firebaseConfig)
 
-const hasMissingFirebaseConfig = firebaseEnvKeys.some((key) => !import.meta.env[key])
-
-if (hasMissingFirebaseConfig) {
-  console.warn('Firebase nao configurado. Defina as variaveis VITE_FIREBASE_* para habilitar login com Google.')
-}
-
-const app = hasMissingFirebaseConfig ? null : initializeApp(firebaseConfig)
-
-export const auth = app ? getAuth(app) : null
-export const isFirebaseConfigured = !hasMissingFirebaseConfig
+export const auth = getAuth(app)
+export const db = getFirestore(app)
+export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId)

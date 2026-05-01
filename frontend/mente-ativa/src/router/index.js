@@ -23,6 +23,12 @@ const routes = [
     component: Home
   },
   {
+    path: '/testes',
+    name: 'TestesCognitivos',
+    component: () => import('../views/TestesCognitivos.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue') 
@@ -47,7 +53,29 @@ const routes = [
   {
     path: '/teste/memorias',
     name: 'TesteMemorias',
-    component: () => import('../views/TesteMemorias.vue'),
+    redirect: '/testes/memoria-curto-prazo'
+  },
+  {
+    path: '/teste/alzheimer',
+    name: 'TesteAlzheimer',
+    redirect: '/testes'
+  },
+  {
+    path: '/testes/memoria-curto-prazo',
+    name: 'TesteMemoriaCurtoPrazo',
+    component: () => import('../views/TesteMemoriaCurtoPrazo.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/testes/fluencia-semantica',
+    name: 'TesteFluenciaSemantica',
+    component: () => import('../views/TesteFluenciaSemantica.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/testes/atencao-alternada',
+    name: 'TesteAtencaoAlternada',
+    component: () => import('../views/TesteAtencaoAlternada.vue'),
     meta: { requiresAuth: true }
   }
   // Futuramente colocaremos a rota '/teste' e '/login' aqui!

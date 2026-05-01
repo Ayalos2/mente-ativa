@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .database import engine, Base, get_db
 from .services.firebase_auth import verify_firebase_token
+from .services.test_results import listar_historico_teste, salvar_resultado_teste
 
 app = FastAPI(title="Mente Ativa API")
 
@@ -28,6 +29,17 @@ class LoginSchema(BaseModel):
 class GoogleLoginSchema(BaseModel):
     credential: str
     user: dict | None = None
+
+
+class TestResultSchema(BaseModel):
+    userKey: str
+    userEmail: str | None = None
+    userName: str | None = None
+    userPhoto: str | None = None
+    testId: str
+    testName: str
+    summary: dict
+    questionResults: list[dict]
 
 @app.post("/login")
 def login(dados: LoginSchema, db: Session = Depends(get_db)):
@@ -99,3 +111,15 @@ def test_db(db: Session = Depends(get_db)):
         return {"status": "Conexão com Supabase bem-sucedida!"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=503, detail=f"Falha na conexão com banco: {str(e)}")
+
+
+@app.post("/tests/results")
+def salvar_resultado_teste_api(dados: TestResultSchema):
+    documento_id = salvar_resultado_teste(dados.model_dump())
+    return {"status": "sucesso", "id": documento_id}
+
+
+@app.get("/tests/results")
+def listar_resultados_teste_api(userKey: str, limit: int = 20):
+    resultados = listar_historico_teste(userKey=userKey, limit_count=limit)
+    return {"status": "sucesso", "resultados": resultados}

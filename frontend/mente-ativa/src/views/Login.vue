@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '../config/firebase'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
 
 
@@ -23,16 +25,30 @@ const realizarLogin = async () => {
     })
 
     if (resposta.data.status === 'sucesso') {
-      const userProfile = {
-        email: email.value,
-        nome: resposta.data.usuario || email.value,
-        provedor: 'email',
+      try {
+        let firebaseSession
+
+        try {
+          firebaseSession = await signInWithEmailAndPassword(auth, email.value, senha.value)
+        } catch (signInError) {
+          firebaseSession = await createUserWithEmailAndPassword(auth, email.value, senha.value)
+        }
+
+        const userProfile = {
+          email: email.value,
+          nome: resposta.data.usuario || email.value,
+          provedor: 'email',
+          uid: firebaseSession.user.uid,
+        }
+
+        sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+
+        alert('Bem-vindo, ' + (resposta.data.usuario || email.value))
+        router.push(route.query.redirect || '/profile')
+      } catch (firebaseError) {
+        console.error('Erro ao autenticar no Firebase:', firebaseError)
+        alert('Nao foi possivel criar a sessao no Firebase. Verifique se Email/Senha esta habilitado no Firebase Auth.')
       }
-
-      sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
-
-      alert('Bem-vindo, ' + (resposta.data.usuario || email.value))
-      router.push(route.query.redirect || '/profile')
     } else {
       alert(resposta.data.mensagem)
     }

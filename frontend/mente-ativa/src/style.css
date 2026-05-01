@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
-/* Desativa a seleção de texto em toda a aplicação, 
-   exceto em campos de entrada (inputs e textareas) */
-body {
-    -webkit-user-select: none; /* Safari */
-    -ms-user-select: none;     /* Internet Explorer/Edge */
-    user-select: none;         /* Padrão (Chrome, Firefox, etc.) */
+html {
+    scroll-behavior: smooth;
 }
 
-/* Garante que o usuário ainda consiga digitar nos formulários */
+body {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.6;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
 input, textarea {
     -webkit-user-select: text;
     -ms-user-select: text;

@@ -6,7 +6,7 @@ const router = useRouter()
 
 // Funções de navegação para os botões principais
 const irParaTeste = () => {
-  router.push('/teste/memorias')
+  router.push('/testes')
 }
 
 const irParaLogin = () => {
@@ -15,6 +15,10 @@ const irParaLogin = () => {
 
 const irParaCadastro = () => {
   router.push('/cadastro')
+}
+
+const irParaPainelMedico = () => {
+  router.push('/profile')
 }
 </script>
 
@@ -74,7 +78,7 @@ const irParaCadastro = () => {
             class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-12 py-5 rounded-2xl text-xl font-bold transition-all shadow-lg shadow-emerald-200 active:scale-95 focus:outline-none focus:ring-4 focus:ring-emerald-300"
             aria-label="Iniciar um novo teste cognitivo"
           >
-            Iniciar Novo Teste
+            Abrir painel de testes
           </button>
           
           <button 
