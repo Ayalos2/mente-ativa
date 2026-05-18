@@ -520,7 +520,7 @@ const baixarRegistro = (registro) => {
           <h2 class="text-2xl font-bold text-slate-900 mb-6">Configurações da Conta</h2>
           
           <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer">
+            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer" @click="router.push('/profile/edit')">
               <div>
                 <p class="font-medium text-slate-900">Editar Perfil</p>
                 <p class="text-sm text-slate-600">Atualize suas informações pessoais</p>
