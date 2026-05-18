@@ -1,30 +1,69 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
+import { auth, db } from '../config/firebase'
 
 const router = useRouter()
+const route = useRoute()
 
 // Estados do formulário
 const nome = ref('')
 const email = ref('')
 const senha = ref('')
 const confirmSenha = ref('')
-const cargo = ref('especialista') // Valor padrão
+const cargo = ref(route.query.role || 'paciente') // Valor padrão pode vir da query
+const crmcrp = ref('')
 const carregando = ref(false)
+const erroCadastro = ref('')
 
 const realizarCadastro = async () => {
+  erroCadastro.value = ''
+
   if (senha.value !== confirmSenha.value) {
-    alert("As senhas não coincidem!")
+    erroCadastro.value = 'As senhas não coincidem.'
     return
   }
 
   carregando.value = true
-  
-  // Simulação de registro (Aqui entrará a chamada para o seu FastAPI/Supabase)
-  setTimeout(() => {
+
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, email.value.trim(), senha.value)
+
+    await updateProfile(credential.user, {
+      displayName: nome.value.trim(),
+    })
+
+    const userProfile = {
+      uid: credential.user.uid,
+      email: credential.user.email,
+      nome: nome.value.trim(),
+      provedor: 'email',
+      cargo: cargo.value,
+      crmcrp: cargo.value === 'especialista' ? crmcrp.value.trim() : '',
+    }
+
+    sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+
+    await setDoc(doc(db, 'usuarios', credential.user.uid), {
+      uid: credential.user.uid,
+      email: credential.user.email,
+      nome: nome.value.trim(),
+      cargo: cargo.value,
+      crmcrp: cargo.value === 'especialista' ? crmcrp.value.trim() : '',
+      provedor: 'email',
+      createdAtMs: Date.now(),
+      createdAtIso: new Date().toISOString(),
+    }, { merge: true })
+
+    router.push('/profile')
+  } catch (error) {
+    console.error('Erro ao criar conta:', error)
+    erroCadastro.value = error?.message || 'Nao foi possivel criar a conta.'
+  } finally {
     carregando.value = false
-    router.push('/login')
-  }, 2000)
+  }
 }
 </script>
 
@@ -52,6 +91,9 @@ const realizarCadastro = async () => {
       <div class="bg-white py-10 px-6 shadow-xl shadow-slate-200/50 sm:rounded-3xl sm:px-12 border border-slate-100">
         
         <form class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4" @submit.prevent="realizarCadastro">
+          <div v-if="erroCadastro" class="sm:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {{ erroCadastro }}
+          </div>
           
           <div class="sm:col-span-2">
             <label class="block text-sm font-semibold text-slate-700">Nome Completo</label>

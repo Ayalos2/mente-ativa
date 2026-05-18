@@ -2,9 +2,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
 import { auth } from '../config/firebase'
+import { db } from '../config/firebase'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
 
 
@@ -14,46 +15,34 @@ const email = ref('')
 const senha = ref('')
 const carregando = ref(false)
 
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 const realizarLogin = async () => {
   carregando.value = true
   try {
-    const resposta = await axios.post(`${apiBaseUrl}/login`, {
-      email: email.value,
-      senha: senha.value
-    })
+    const firebaseSession = await signInWithEmailAndPassword(auth, email.value.trim(), senha.value)
+    const displayName = firebaseSession.user.displayName || email.value.trim()
 
-    if (resposta.data.status === 'sucesso') {
-      try {
-        let firebaseSession
-
-        try {
-          firebaseSession = await signInWithEmailAndPassword(auth, email.value, senha.value)
-        } catch (signInError) {
-          firebaseSession = await createUserWithEmailAndPassword(auth, email.value, senha.value)
-        }
-
-        const userProfile = {
-          email: email.value,
-          nome: resposta.data.usuario || email.value,
-          provedor: 'email',
-          uid: firebaseSession.user.uid,
-        }
-
-        sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
-
-        alert('Bem-vindo, ' + (resposta.data.usuario || email.value))
-        router.push(route.query.redirect || '/profile')
-      } catch (firebaseError) {
-        console.error('Erro ao autenticar no Firebase:', firebaseError)
-        alert('Nao foi possivel criar a sessao no Firebase. Verifique se Email/Senha esta habilitado no Firebase Auth.')
-      }
-    } else {
-      alert(resposta.data.mensagem)
+    const userProfile = {
+      email: firebaseSession.user.email,
+      nome: displayName,
+      provedor: 'email',
+      uid: firebaseSession.user.uid,
     }
+
+    sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+
+    alert('Bem-vindo, ' + displayName)
+    router.push(route.query.redirect || '/profile')
   } catch (error) {
-    alert('Erro ao conectar com o servidor. Verifique se o backend está rodando!')
+    const firebaseError = error?.code || ''
+
+    if (firebaseError === 'auth/invalid-credential' || firebaseError === 'auth/wrong-password' || firebaseError === 'auth/user-not-found') {
+      alert('E-mail ou senha incorretos.')
+    } else if (firebaseError === 'auth/invalid-email') {
+      alert('E-mail inválido.')
+    } else {
+      console.error('Erro ao autenticar com Firebase:', error)
+      alert('Nao foi possivel entrar com email e senha. Verifique se o Firebase Auth está configurado.')
+    }
   } finally {
     carregando.value = false
   }
@@ -61,30 +50,31 @@ const realizarLogin = async () => {
 
 const lidarComSucessoGoogle = async (resultado) => {
   try {
-    const resposta = await axios.post(`${apiBaseUrl}/auth/google`, {
-      credential: resultado.token,
-      user: resultado.user,
-    })
-
-    if (resposta.data.status === 'sucesso') {
-      // Salva dados do usuário no sessionStorage
-      const userProfile = {
-        email: resposta.data.email,
-        nome: resposta.data.usuario,
-        provedor: resposta.data.provedor,
-        uid: resultado.user.uid,
-        foto: resultado.user.foto
-      }
-      sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
-      
-      // Redireciona para o destino protegido requisitado, quando existir
-      router.push(route.query.redirect || '/profile')
-      return
+    const userProfile = {
+      email: resultado.user.email,
+      nome: resultado.user.nome || resultado.user.displayName || resultado.user.email,
+      provedor: 'google',
+      uid: resultado.user.uid,
+      foto: resultado.user.foto || resultado.user.photoURL || null,
     }
-    alert(resposta.data.mensagem || 'Nao foi possivel entrar com Google.')
+
+    sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+
+    await setDoc(doc(db, 'usuarios', resultado.user.uid), {
+      uid: resultado.user.uid,
+      email: resultado.user.email,
+      nome: userProfile.nome,
+      cargo: resultado.user.cargo || 'paciente',
+      foto: userProfile.foto,
+      provedor: 'google',
+      createdAtMs: Date.now(),
+      createdAtIso: new Date().toISOString(),
+    }, { merge: true })
+
+    router.push(route.query.redirect || '/profile')
   } catch (error) {
-    const detalheBackend = error?.response?.data?.detail
-    alert(detalheBackend || 'Falha no login Google. Verifique a configuracao do Firebase e do backend.')
+    console.error('Falha no login Google:', error)
+    alert('Falha no login Google. Verifique a configuracao do Firebase.')
   }
 }
 
@@ -186,9 +176,18 @@ const lidarComSucessoGoogle = async (resultado) => {
             </div>
           </div>
 
-          <div class="mt-6">
-            <button class="w-full flex justify-center py-3 px-4 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all">
-              Solicitar Acesso Especialista
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <button
+              @click="router.push({ path: '/cadastro', query: { role: 'especialista' } })"
+              class="w-full flex justify-center py-3 px-4 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all"
+            >
+              Sou médico (cadastrar)
+            </button>
+            <button
+              @click="router.push('/cadastro')"
+              class="w-full flex justify-center py-3 px-4 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all"
+            >
+              Criar conta
             </button>
           </div>
         </div>

@@ -7,6 +7,7 @@ import DiagnosticHistoryPanel from '../components/diagnostics/DiagnosticHistoryP
 import { carregarHistoricoTestes, formatarResultadoTeste } from '../services/testResults'
 import { getCurrentUserProfile } from '../services/sessionUser'
 import { downloadJson } from '../utils/downloadJson'
+import { carregarPacientesDoMedico, carregarTestesDoPaciente, vincularPacientePorEmail } from '../services/doctorLinks'
 
 const router = useRouter()
 const userData = ref(null)
@@ -14,6 +15,15 @@ const loading = ref(true)
 const historicoTestes = ref([])
 const carregandoHistorico = ref(false)
 const erroHistorico = ref('')
+const cargoEhEspecialista = computed(() => userData.value?.cargo === 'especialista')
+const emailPacienteVinculo = ref('')
+const carregandoVinculos = ref(false)
+const erroVinculos = ref('')
+const pacientesVinculados = ref([])
+const pacienteSelecionado = ref(null)
+const testesPacienteSelecionado = ref([])
+const carregandoTestesPaciente = ref(false)
+const erroTestesPaciente = ref('')
 
 const totalTestes = computed(() => historicoTestes.value.length)
 const mediaPrecisao = computed(() => {
@@ -60,6 +70,84 @@ const abrirTesteAtencao = () => {
   router.push('/testes/atencao-alternada')
 }
 
+const formatarResumoTeste = (teste) => {
+  if (!teste) {
+    return 'Sem testes'
+  }
+
+  const resumo = teste.summary || {}
+  const precisa = resumo.accuracyPercent ?? resumo.totalCorrect ?? resumo.correctResponses ?? 0
+  const tempo = resumo.averageLatencyMs ?? resumo.completionTimeMs ?? resumo.averageResponseMs ?? 0
+
+  return `${precisa}% | ${tempo} ms`
+}
+
+const selecionarPaciente = async (paciente) => {
+  pacienteSelecionado.value = paciente
+  carregandoTestesPaciente.value = true
+  erroTestesPaciente.value = ''
+
+  try {
+    const resposta = await carregarTestesDoPaciente(paciente.patientUid)
+    testesPacienteSelecionado.value = resposta.data.tests || []
+  } catch (error) {
+    console.error('Erro ao carregar testes do paciente:', error)
+    erroTestesPaciente.value = error?.response?.data?.detail || 'Nao foi possivel carregar os testes do paciente.'
+    testesPacienteSelecionado.value = []
+  } finally {
+    carregandoTestesPaciente.value = false
+  }
+}
+
+const carregarVinculos = async () => {
+  if (!cargoEhEspecialista.value) {
+    return
+  }
+
+  carregandoVinculos.value = true
+  erroVinculos.value = ''
+
+  try {
+    const resposta = await carregarPacientesDoMedico()
+    pacientesVinculados.value = resposta.data.patients || []
+
+    if (pacientesVinculados.value.length) {
+      const pacienteAtual = pacientesVinculados.value.find((paciente) => pacienteSelecionado.value?.patientUid === paciente.patientUid) || pacientesVinculados.value[0]
+      await selecionarPaciente(pacienteAtual)
+    } else {
+      pacienteSelecionado.value = null
+      testesPacienteSelecionado.value = []
+    }
+  } catch (error) {
+    console.error('Erro ao carregar pacientes vinculados:', error)
+    erroVinculos.value = error?.response?.data?.detail || 'Nao foi possivel carregar os pacientes vinculados.'
+  } finally {
+    carregandoVinculos.value = false
+  }
+}
+
+const vincularPaciente = async () => {
+  erroVinculos.value = ''
+
+  if (!emailPacienteVinculo.value.trim()) {
+    erroVinculos.value = 'Informe o e-mail do paciente.'
+    return
+  }
+
+  carregandoVinculos.value = true
+
+  try {
+    await vincularPacientePorEmail(emailPacienteVinculo.value.trim())
+    emailPacienteVinculo.value = ''
+    await carregarVinculos()
+  } catch (error) {
+    console.error('Erro ao vincular paciente:', error)
+    erroVinculos.value = error?.response?.data?.detail || 'Nao foi possivel vincular o paciente.'
+  } finally {
+    carregandoVinculos.value = false
+  }
+}
+
 const carregarHistorico = async () => {
   carregandoHistorico.value = true
   erroHistorico.value = ''
@@ -82,6 +170,10 @@ onMounted(() => {
   if (storedUser) {
     userData.value = JSON.parse(storedUser)
     carregarHistorico()
+
+    if (JSON.parse(storedUser)?.cargo === 'especialista') {
+      carregarVinculos()
+    }
   } else {
     // Se não houver dados, redireciona para login
     router.push('/login')
@@ -238,6 +330,133 @@ const baixarRegistro = (registro) => {
         </div>
 
         <!-- Recent Tests -->
+        <div v-if="cargoEhEspecialista" class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
+          <div class="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900">Vínculo médico-paciente</h2>
+              <p class="text-slate-600 mt-2">Vincule pacientes pelo e-mail e acesse os testes deles em uma lista própria.</p>
+            </div>
+            <div class="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-4 py-2">
+              Área restrita para especialistas
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1 space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">E-mail do paciente</label>
+                <input
+                  v-model="emailPacienteVinculo"
+                  type="email"
+                  placeholder="paciente@email.com"
+                  class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
+                />
+              </div>
+
+              <button
+                @click="vincularPaciente"
+                :disabled="carregandoVinculos"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {{ carregandoVinculos ? 'Vinculando...' : 'Vincular paciente' }}
+              </button>
+
+              <p v-if="erroVinculos" class="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                {{ erroVinculos }}
+              </p>
+
+              <p class="text-xs text-slate-500">
+                O paciente precisa estar cadastrado no sistema com o mesmo e-mail informado.
+              </p>
+            </div>
+
+            <div class="lg:col-span-2">
+              <div v-if="carregandoVinculos" class="flex items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
+              </div>
+
+              <div v-else-if="!pacientesVinculados.length" class="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center">
+                <span class="text-4xl mb-3">👥</span>
+                <p class="text-lg font-bold text-slate-900">Nenhum paciente vinculado</p>
+                <p class="text-sm text-slate-600 mt-1">Use o e-mail do paciente para criar o vínculo e liberar os testes.</p>
+              </div>
+
+              <div v-else class="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
+                <button
+                  v-for="paciente in pacientesVinculados"
+                  :key="paciente.patientUid"
+                  @click="selecionarPaciente(paciente)"
+                  class="w-full text-left rounded-2xl border p-4 transition-all"
+                  :class="pacienteSelecionado?.patientUid === paciente.patientUid ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'"
+                >
+                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <p class="font-bold text-slate-900">{{ paciente.patientName }}</p>
+                      <p class="text-sm text-slate-600">{{ paciente.patientEmail }}</p>
+                    </div>
+                    <div class="text-sm text-slate-500 sm:text-right">
+                      <p>{{ paciente.testsCount || 0 }} teste(s)</p>
+                      <p>Vinculado em {{ formatarDataHora(paciente.linkedAtMs) }}</p>
+                    </div>
+                  </div>
+                  <p class="mt-3 text-sm text-slate-700">
+                    Último teste: {{ paciente.latestTest ? `${paciente.latestTest.testName} · ${formatarDataHora(paciente.latestTest.createdAtMs)}` : 'Nenhum teste registrado' }}
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="pacienteSelecionado" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h3 class="text-xl font-bold text-slate-900">{{ pacienteSelecionado.patientName }}</h3>
+                <p class="text-sm text-slate-600">{{ pacienteSelecionado.patientEmail }}</p>
+              </div>
+              <div class="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-full px-4 py-2">
+                {{ testesPacienteSelecionado.length }} teste(s) acessível(is)
+              </div>
+            </div>
+
+            <div v-if="carregandoTestesPaciente" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
+            </div>
+
+            <p v-else-if="erroTestesPaciente" class="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              {{ erroTestesPaciente }}
+            </p>
+
+            <div v-else-if="testesPacienteSelecionado.length" class="grid gap-4 md:grid-cols-2">
+              <article
+                v-for="teste in testesPacienteSelecionado"
+                :key="teste.id"
+                class="rounded-2xl border border-white bg-white p-4 shadow-sm"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <p class="font-bold text-slate-900">{{ teste.testName }}</p>
+                    <p class="text-xs text-slate-500">{{ formatarDataHora(teste.createdAtMs) }}</p>
+                  </div>
+                  <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                    {{ teste.testTypeLabel || teste.testType || teste.testId }}
+                  </span>
+                </div>
+
+                <p class="mt-3 text-sm text-slate-700">Resumo: {{ formatarResumoTeste(teste) }}</p>
+                <div class="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span class="rounded-full bg-slate-100 px-3 py-1">Clicks: {{ teste.totalClicks || 0 }}</span>
+                  <span class="rounded-full bg-slate-100 px-3 py-1">Erros: {{ teste.errorCount || 0 }}</span>
+                  <span class="rounded-full bg-slate-100 px-3 py-1">Acertos: {{ teste.totalCorrect || teste.correctResponses || 0 }}</span>
+                </div>
+              </article>
+            </div>
+
+            <div v-else class="text-sm text-slate-600 bg-white border border-dashed border-slate-300 rounded-2xl p-5">
+              Este paciente ainda não possui testes registrados.
+            </div>
+          </div>
+        </div>
+
         <div class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
           <h2 class="text-2xl font-bold text-slate-900 mb-6">Histórico de Testes</h2>
           

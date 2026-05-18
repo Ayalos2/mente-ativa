@@ -1,12 +1,14 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from firebase_admin import firestore
 from .database import engine, Base, get_db
 from .services.firebase_auth import verify_firebase_token
+from .services.firebase_firestore import get_firestore_client
 from .services.test_results import listar_historico_teste, salvar_resultado_teste
 
 app = FastAPI(title="Mente Ativa API")
@@ -40,6 +42,10 @@ class TestResultSchema(BaseModel):
     testName: str
     summary: dict
     questionResults: list[dict]
+
+
+class LinkPatientSchema(BaseModel):
+    patientEmail: str
 
 @app.post("/login")
 def login(dados: LoginSchema, db: Session = Depends(get_db)):
@@ -119,7 +125,225 @@ def salvar_resultado_teste_api(dados: TestResultSchema):
     return {"status": "sucesso", "id": documento_id}
 
 
+@app.post('/links')
+def create_link(payload: dict = Body(...)):
+    doctor = payload.get('doctorKey')
+    patient = payload.get('patientKey')
+
+    if not doctor or not patient:
+        raise HTTPException(status_code=400, detail='doctorKey and patientKey are required')
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text('INSERT INTO vinculos_medicos (doctor_key, patient_key) VALUES (:doctor, :patient) ON CONFLICT DO NOTHING'),
+                {'doctor': doctor, 'patient': patient}
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {'status': 'sucesso'}
+
+
+@app.delete('/links')
+def delete_link(payload: dict = Body(...)):
+    doctor = payload.get('doctorKey')
+    patient = payload.get('patientKey')
+
+    if not doctor or not patient:
+        raise HTTPException(status_code=400, detail='doctorKey and patientKey are required')
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text('DELETE FROM vinculos_medicos WHERE doctor_key = :doctor AND patient_key = :patient'),
+                {'doctor': doctor, 'patient': patient}
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {'status': 'sucesso'}
+
+
+@app.get('/links/doctor/{doctor_key}')
+def list_patients_for_doctor(doctor_key: str):
+    try:
+        with engine.connect() as conn:
+            resultados = conn.execute(
+                text('SELECT patient_key, created_at FROM vinculos_medicos WHERE doctor_key = :doctor ORDER BY created_at DESC'),
+                {'doctor': doctor_key}
+            ).fetchall()
+
+            return {'status': 'sucesso', 'patients': [dict(r) for r in resultados]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get('/links/patient/{patient_key}')
+def list_doctors_for_patient(patient_key: str):
+    try:
+        with engine.connect() as conn:
+            resultados = conn.execute(
+                text('SELECT doctor_key, created_at FROM vinculos_medicos WHERE patient_key = :patient ORDER BY created_at DESC'),
+                {'patient': patient_key}
+            ).fetchall()
+
+            return {'status': 'sucesso', 'doctors': [dict(r) for r in resultados]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @app.get("/tests/results")
 def listar_resultados_teste_api(userKey: str, limit: int = 20):
     resultados = listar_historico_teste(userKey=userKey, limit_count=limit)
     return {"status": "sucesso", "resultados": resultados}
+
+
+def _get_bearer_token(request: Request) -> str:
+    authorization = request.headers.get("authorization") or ""
+
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+
+    return ""
+
+
+def _fetch_firestore_doc_by_uid(collection_name: str, uid: str):
+    client = get_firestore_client()
+    documento = client.collection(collection_name).document(uid).get()
+    if documento.exists:
+        data = documento.to_dict() or {}
+        data["id"] = documento.id
+        return data
+    return None
+
+
+@app.post("/doctor-links/link")
+def vincular_paciente_medico(payload: LinkPatientSchema, request: Request):
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    email = payload.patientEmail.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="patientEmail e obrigatorio")
+
+    pacientes = list(
+        client.collection("usuarios")
+        .where("email", "==", email)
+        .limit(1)
+        .stream()
+    )
+
+    if not pacientes:
+        raise HTTPException(status_code=404, detail="Paciente nao encontrado para este e-mail")
+
+    paciente_doc = pacientes[0]
+    paciente_data = paciente_doc.to_dict() or {}
+    patient_uid = paciente_data.get("uid") or paciente_doc.id
+
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    documento_vinculo = {
+        "doctorUid": doctor_uid,
+        "doctorEmail": doctor_info.get("email"),
+        "patientUid": patient_uid,
+        "patientEmail": paciente_data.get("email") or email,
+        "patientName": paciente_data.get("nome") or paciente_data.get("email") or email,
+        "createdAtMs": int(__import__("time").time() * 1000),
+        "createdAtIso": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+
+    client.collection("vinculos_medico_paciente").document(vinculo_id).set(documento_vinculo, merge=True)
+
+    return {
+        "status": "sucesso",
+        "vinculo": documento_vinculo,
+    }
+
+
+@app.get("/doctor-links/patients")
+def listar_pacientes_do_medico(request: Request):
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    query = (
+        client.collection("vinculos_medico_paciente")
+        .where("doctorUid", "==", doctor_uid)
+        .order_by("createdAtMs", direction=firestore.Query.DESCENDING)
+    )
+
+    pacientes = []
+    for documento in query.stream():
+        link = documento.to_dict() or {}
+        patient_uid = link.get("patientUid")
+        patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
+
+        historico = listar_historico_teste(user_key=patient_uid, limit_count=1)
+        ultimo_teste = historico[0] if historico else None
+
+        pacientes.append({
+            "linkId": documento.id,
+            "patientUid": patient_uid,
+            "patientEmail": link.get("patientEmail") or patient_profile.get("email"),
+            "patientName": link.get("patientName") or patient_profile.get("nome") or link.get("patientEmail"),
+            "patientPhoto": patient_profile.get("foto"),
+            "linkedAtMs": link.get("createdAtMs"),
+            "testsCount": len(listar_historico_teste(user_key=patient_uid, limit_count=200)),
+            "latestTest": ultimo_teste,
+        })
+
+    return {
+        "status": "sucesso",
+        "patients": pacientes,
+    }
+
+
+@app.get("/doctor-links/patients/{patient_uid}/tests")
+def listar_testes_do_paciente(patient_uid: str, request: Request):
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
+    historico = listar_historico_teste(user_key=patient_uid, limit_count=50)
+
+    return {
+        "status": "sucesso",
+        "patientUid": patient_uid,
+        "tests": historico,
+    }

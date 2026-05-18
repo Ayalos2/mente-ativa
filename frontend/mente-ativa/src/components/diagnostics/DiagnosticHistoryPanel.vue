@@ -1,4 +1,6 @@
 <script setup>
+import { getFeedbackForResult } from '../../services/testResults'
+
 defineProps({
   records: {
     type: Array,
@@ -35,6 +37,30 @@ const summaryText = (record) => {
   }
   return `${summary.completionTimeMs ?? 0} ms | ${summary.errorCount ?? 0} erros`
 }
+
+const feedbackFor = (record) => {
+  try {
+    const result = getFeedbackForResult(record)
+    return result.feedback || null
+  } catch (e) {
+    return null
+  }
+}
+
+const getFeedbackClass = (category) => {
+  switch (category) {
+    case 'normal':
+      return 'bg-emerald-50 text-emerald-800 border-emerald-100'
+    case 'monitor':
+      return 'bg-amber-50 text-amber-800 border-amber-100'
+    case 'procurar_medico':
+      return 'bg-amber-100 text-amber-900 border-amber-100'
+    case 'urgencia':
+      return 'bg-red-50 text-red-800 border-red-100'
+    default:
+      return 'bg-slate-50 text-slate-800 border-slate-100'
+  }
+}
 </script>
 
 <template>
@@ -59,6 +85,14 @@ const summaryText = (record) => {
             </div>
             <h3 class="text-2xl font-black text-slate-900">{{ record.testName }}</h3>
             <p class="text-slate-600">{{ formatDate(record.createdAtMs) }}</p>
+            <div v-if="feedbackFor(record)" :class="`mt-3 p-3 rounded-lg border ${getFeedbackClass(feedbackFor(record).category)}`">
+              <p class="text-sm font-bold">{{ feedbackFor(record).shortMessage }}</p>
+              <details class="mt-2 text-sm">
+                <summary class="font-medium">Ver detalhes</summary>
+                <p class="mt-2 text-slate-700">{{ feedbackFor(record).detailedMessage }}</p>
+                <p v-if="feedbackFor(record).recommendedRetestDays" class="mt-2 text-xs text-slate-500">Recomenda-se retestar em {{ feedbackFor(record).recommendedRetestDays }} dias.</p>
+              </details>
+            </div>
           </div>
 
           <div class="flex flex-wrap gap-3">
