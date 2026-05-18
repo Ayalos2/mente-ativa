@@ -45,6 +45,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/profile/historico',
+    name: 'HistoricoTestes',
+    component: () => import('../views/HistoricoTestes.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/profile/edit',
     name: 'EditProfile',
     component: () => import('../views/EditProfile.vue'),

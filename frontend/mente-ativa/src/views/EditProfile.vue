@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { getCurrentUserProfile } from '../services/sessionUser'
+import { searchDoctorsByName } from '../services/doctorSearch'
+import { requestLinkDoctor } from '../services/doctorLinks'
 
 const router = useRouter()
 
@@ -34,6 +36,47 @@ const notasPrivadas = ref('')
 const carregando = ref(false)
 const mensagem = ref('')
 const erro = ref('')
+
+// Vincular médico (para pacientes)
+const doctorQuery = ref('')
+const doctorSuggestions = ref([])
+const searchingDoctors = ref(false)
+const linkMessage = ref('')
+let doctorSearchTimer = null
+const onDoctorInput = () => {
+  linkMessage.value = ''
+  doctorSuggestions.value = []
+
+  if (doctorSearchTimer) clearTimeout(doctorSearchTimer)
+
+  const q = doctorQuery.value.trim()
+  if (!q) return
+
+  doctorSearchTimer = setTimeout(async () => {
+    try {
+      searchingDoctors.value = true
+      doctorSuggestions.value = await searchDoctorsByName(q, 20)
+    } catch (e) {
+      console.error('Erro ao buscar medicos:', e)
+      doctorSuggestions.value = []
+    } finally {
+      searchingDoctors.value = false
+    }
+  }, 300)
+}
+
+const selectDoctorToLink = async (doctor) => {
+  linkMessage.value = ''
+  try {
+    await requestLinkDoctor(doctor.uid)
+    linkMessage.value = `Solicitação enviada para ${doctor.nome}.` 
+    doctorSuggestions.value = []
+    doctorQuery.value = ''
+  } catch (e) {
+    console.error('Erro ao solicitar vínculo:', e)
+    linkMessage.value = e?.response?.data?.detail || 'Não foi possível enviar a solicitação.'
+  }
+}
 
 onMounted(async () => {
   const perfil = getCurrentUserProfile()
@@ -308,6 +351,34 @@ const salvar = async () => {
           <div>
             <label class="block text-sm font-semibold text-slate-700">Notas privadas</label>
             <textarea v-model="notasPrivadas" rows="3" class="mt-1 block w-full px-4 py-3 border rounded-xl"></textarea>
+          </div>
+
+          <!-- Vincular médico (apenas para pacientes) -->
+          <div v-if="cargo === 'paciente'" class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <h3 class="font-semibold text-slate-800 mb-2">Vincular Médico</h3>
+            <p class="text-sm text-slate-600 mb-3">Pesquise e solicite vínculo com um profissional para que ele acesse seus resultados.</p>
+
+            <div class="max-w-lg">
+              <input v-model="doctorQuery" @input="onDoctorInput" placeholder="Digite o nome do médico..." class="w-full px-4 py-3 border rounded-xl" />
+
+              <div v-if="searchingDoctors" class="mt-2 text-sm text-slate-500">Buscando...</div>
+
+              <ul v-if="doctorSuggestions.length" class="mt-2 max-h-48 overflow-y-auto border rounded-xl bg-white">
+                <li v-for="doc in doctorSuggestions" :key="doc.uid" class="px-3 py-2 hover:bg-slate-50 border-b last:border-b-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-medium">{{ doc.nome }}</div>
+                      <div class="text-xs text-slate-500">{{ doc.instituicao || doc.crmcrp || doc.email }}</div>
+                    </div>
+                    <div>
+                      <button @click.prevent="selectDoctorToLink(doc)" class="bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm">Solicitar vínculo</button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+
+              <p v-if="linkMessage" class="mt-2 text-sm text-emerald-700">{{ linkMessage }}</p>
+            </div>
           </div>
 
           <div class="flex items-center gap-3 mt-4">
