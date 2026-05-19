@@ -476,7 +476,7 @@ const baixarRegistro = (registro) => {
               <button @click="abrirHistorico" class="w-full text-left p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors">
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="font-medium text-slate-900">Histórico de testes (meu)</p>
+                    <p class="font-medium text-slate-900">Histórico de testes</p>
                     <p class="text-sm text-slate-600">Ver seus testes anteriores</p>
                   </div>
                   <span class="text-xl">→</span>
