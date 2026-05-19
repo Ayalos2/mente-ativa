@@ -213,6 +213,12 @@ const salvar = async () => {
             </div>
             <span class="font-bold text-slate-800">Mente Ativa</span>
           </div>
+          <button
+            @click="router.push('/profile')"
+            class="text-slate-500 hover:text-emerald-600 flex items-center gap-2 transition-colors font-medium"
+          >
+            <span>←</span> Voltar
+          </button>
         </div>
       </div>
     </nav>

@@ -64,6 +64,12 @@ onMounted(() => carregar())
     </nav>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="mb-6">
+        <button @click="router.push('/profile')" class="text-slate-500 hover:text-emerald-600 flex items-center gap-2 transition-colors font-medium">
+          <span>←</span> Voltar para o Perfil
+        </button>
+      </div>
+      
       <div class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
         <h1 class="text-2xl font-bold text-slate-900 mb-2">Histórico de Testes</h1>
         <p class="text-slate-600 mb-6">Lista completa dos testes realizados por você.</p>

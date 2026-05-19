@@ -110,6 +110,12 @@ const lidarComSucessoGoogle = async (resultado) => {
 <template>
   <div class="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
     
+    <div class="absolute top-8 left-8">
+      <button @click="router.push('/')" class="text-slate-500 hover:text-emerald-600 flex items-center gap-2 transition-colors font-medium">
+        <span>←</span> Voltar para a Home
+      </button>
+    </div>
+
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
       <div @click="router.push('/')" class="cursor-pointer inline-flex items-center gap-2 mb-6 select-none">
         <div class="bg-emerald-600 p-2 rounded-lg shadow-md">
