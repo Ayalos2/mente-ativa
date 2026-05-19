@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../config/firebase'
 import Home from '../views/Home.vue'
 
 const isUsuarioAutenticado = () => {
@@ -15,6 +17,20 @@ const isUsuarioAutenticado = () => {
     return false
   }
 }
+
+const aguardarUsuarioFirebase = () => new Promise((resolve) => {
+  if (auth.currentUser) {
+    resolve(auth.currentUser)
+    return
+  }
+
+  const unsub = onAuthStateChanged(auth, (user) => {
+    unsub()
+    resolve(user)
+  })
+
+  setTimeout(() => resolve(auth.currentUser), 4000)
+})
 
 const routes = [
   {
@@ -98,12 +114,18 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) {
     return true
   }
 
   if (isUsuarioAutenticado()) {
+    return true
+  }
+
+  const firebaseUser = await aguardarUsuarioFirebase()
+
+  if (firebaseUser) {
     return true
   }
 
