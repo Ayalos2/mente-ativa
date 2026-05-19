@@ -22,6 +22,7 @@ const emailPacienteVinculo = ref('')
 const carregandoVinculos = ref(false)
 const erroVinculos = ref('')
 const pacientesVinculados = ref([])
+const filtroPacientes = ref('')
 const pacienteSelecionado = ref(null)
 const testesPacienteSelecionado = ref([])
 const carregandoTestesPaciente = ref(false)
@@ -40,6 +41,20 @@ const mediaPrecisao = computed(() => {
   return Math.round(soma / historicoTestes.value.length)
 })
 const ultimoTeste = computed(() => historicoTestes.value[0] || null)
+
+const pacientesFiltrados = computed(() => {
+  const termo = filtroPacientes.value.trim().toLowerCase()
+
+  if (!termo) {
+    return pacientesVinculados.value
+  }
+
+  return pacientesVinculados.value.filter((paciente) => {
+    const nome = (paciente.patientName || '').toLowerCase()
+    const email = (paciente.patientEmail || '').toLowerCase()
+    return nome.includes(termo) || email.includes(termo)
+  })
+})
 
 const formatarDataHora = (valor) => {
   if (!valor) {
@@ -70,18 +85,6 @@ const abrirTesteFluencia = () => {
 
 const abrirTesteAtencao = () => {
   router.push('/testes/atencao-alternada')
-}
-
-const formatarResumoTeste = (teste) => {
-  if (!teste) {
-    return 'Sem testes'
-  }
-
-  const resumo = teste.summary || {}
-  const precisa = resumo.accuracyPercent ?? resumo.totalCorrect ?? resumo.correctResponses ?? 0
-  const tempo = resumo.averageLatencyMs ?? resumo.completionTimeMs ?? resumo.averageResponseMs ?? 0
-
-  return `${precisa}% | ${tempo} ms`
 }
 
 const obterStatusOtimo = (paciente) => {
@@ -124,8 +127,8 @@ const carregarVinculos = async () => {
     const resposta = await carregarPacientesDoMedico()
     pacientesVinculados.value = resposta.data.patients || []
 
-    if (pacientesVinculados.value.length) {
-      const pacienteAtual = pacientesVinculados.value.find((paciente) => pacienteSelecionado.value?.patientUid === paciente.patientUid) || pacientesVinculados.value[0]
+    if (pacientesFiltrados.value.length) {
+      const pacienteAtual = pacientesFiltrados.value.find((paciente) => pacienteSelecionado.value?.patientUid === paciente.patientUid) || pacientesFiltrados.value[0]
       await selecionarPaciente(pacienteAtual)
     } else {
       pacienteSelecionado.value = null
@@ -174,6 +177,25 @@ const carregarHistorico = async () => {
   } finally {
     carregandoHistorico.value = false
   }
+}
+
+const baixarHistoricoPacienteSelecionado = (registro) => {
+  if (!pacienteSelecionado.value) {
+    return
+  }
+
+  downloadJson(
+    `mente-ativa-${pacienteSelecionado.value.patientUid}-${registro.testType || registro.testId}.json`,
+    registro.exportPayload || registro
+  )
+}
+
+const recarregarHistoricoPacienteSelecionado = async () => {
+  if (!pacienteSelecionado.value) {
+    return
+  }
+
+  await selecionarPaciente(pacienteSelecionado.value)
 }
 
 onMounted(() => {
@@ -398,6 +420,20 @@ const baixarRegistro = (registro) => {
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-1 space-y-4">
               <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Pesquisar paciente vinculado</label>
+                <input
+                  v-model="filtroPacientes"
+                  type="text"
+                  placeholder="Buscar por nome ou e-mail"
+                  class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900"
+                />
+              </div>
+
+              <p class="text-xs text-slate-500">
+                {{ pacientesFiltrados.length }} paciente(s) encontrado(s).
+              </p>
+
+              <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-2">E-mail do paciente</label>
                 <input
                   v-model="emailPacienteVinculo"
@@ -429,15 +465,15 @@ const baixarRegistro = (registro) => {
                 <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
               </div>
 
-              <div v-else-if="!pacientesVinculados.length" class="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center">
+              <div v-else-if="!pacientesFiltrados.length" class="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center">
                 <span class="text-4xl mb-3">👥</span>
-                <p class="text-lg font-bold text-slate-900">Nenhum paciente vinculado</p>
-                <p class="text-sm text-slate-600 mt-1">Use o e-mail do paciente para criar o vínculo e liberar os testes.</p>
+                <p class="text-lg font-bold text-slate-900">Nenhum paciente encontrado</p>
+                <p class="text-sm text-slate-600 mt-1">Tente outro nome/e-mail ou vincule um paciente pelo e-mail acima.</p>
               </div>
 
               <div v-else class="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
                 <button
-                  v-for="paciente in pacientesVinculados"
+                  v-for="paciente in pacientesFiltrados"
                   :key="paciente.patientUid"
                   @click="selecionarPaciente(paciente)"
                   class="w-full text-left rounded-2xl border p-4 transition-all"
@@ -459,6 +495,60 @@ const baixarRegistro = (registro) => {
                     </div>
                   </div>
                 </button>
+              </div>
+
+              <div class="pt-2">
+                <p class="text-xs text-slate-500">Clique em um paciente para ver o histórico de testes abaixo.</p>
+              </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+              <div v-if="pacienteSelecionado" class="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 class="text-xl font-bold text-slate-900">Histórico de {{ pacienteSelecionado.patientName }}</h3>
+                    <p class="text-sm text-slate-600">{{ pacienteSelecionado.patientEmail }}</p>
+                  </div>
+                  <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div class="text-sm text-slate-500">
+                      {{ testesPacienteSelecionado.length }} teste(s) exibido(s)
+                    </div>
+                    <button
+                      @click="() => { pacienteSelecionado = null; testesPacienteSelecionado = [] }"
+                      class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-semibold transition-all"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+
+                <p v-if="erroTestesPaciente" class="mt-4 text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                  {{ erroTestesPaciente }}
+                </p>
+
+                <div v-else-if="carregandoTestesPaciente" class="mt-4 flex items-center justify-center py-10 bg-white rounded-xl border border-dashed border-slate-300">
+                  <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
+                </div>
+
+                <div v-else-if="testesPacienteSelecionado.length" class="mt-4">
+                  <DiagnosticHistoryPanel
+                    :records="testesPacienteSelecionado"
+                    @download-json="baixarHistoricoPacienteSelecionado"
+                    @rerun="recarregarHistoricoPacienteSelecionado"
+                  />
+                </div>
+
+                <div v-else class="mt-4 flex flex-col items-center justify-center py-10 bg-white rounded-xl border border-dashed border-slate-300 text-center">
+                  <span class="text-4xl mb-3">🗂️</span>
+                  <p class="text-lg font-bold text-slate-900">Nenhum teste encontrado</p>
+                  <p class="text-sm text-slate-600 mt-1">Esse paciente ainda não possui histórico registrado.</p>
+                </div>
+              </div>
+
+              <div v-else class="flex flex-col items-center justify-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-center">
+                <span class="text-4xl mb-3">🧾</span>
+                <p class="text-lg font-bold text-slate-900">Selecione um paciente</p>
+                <p class="text-sm text-slate-600 mt-1">Ao clicar em um paciente vinculado, o histórico de testes aparece aqui.</p>
               </div>
             </div>
           </div>
