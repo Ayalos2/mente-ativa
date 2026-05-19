@@ -2,7 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { signOut } from 'firebase/auth'
-import { auth } from '../config/firebase'
+import { doc, getDoc } from 'firebase/firestore'
+import { auth, db } from '../config/firebase'
+import { onAuthStateChanged } from 'firebase/auth'
 import DiagnosticHistoryPanel from '../components/diagnostics/DiagnosticHistoryPanel.vue'
 import { carregarHistoricoTestes, formatarResultadoTeste } from '../services/testResults'
 import { getCurrentUserProfile } from '../services/sessionUser'
@@ -80,6 +82,17 @@ const formatarResumoTeste = (teste) => {
   const tempo = resumo.averageLatencyMs ?? resumo.completionTimeMs ?? resumo.averageResponseMs ?? 0
 
   return `${precisa}% | ${tempo} ms`
+}
+
+const obterStatusOtimo = (paciente) => {
+  const resumo = paciente?.latestTest?.summary || paciente?.latestTest || {}
+  const accuracy = Number(resumo.accuracyPercent ?? resumo.totalCorrect ?? resumo.correctResponses ?? 0)
+
+  if (!paciente?.testsCount) {
+    return 'Sem testes'
+  }
+
+  return accuracy >= 80 ? 'Ótimo' : 'Não'
 }
 
 const selecionarPaciente = async (paciente) => {
@@ -164,22 +177,57 @@ const carregarHistorico = async () => {
 }
 
 onMounted(() => {
-  // Obtém dados do usuário armazenados no sessionStorage
-  const storedUser = sessionStorage.getItem('userProfile')
-  
-  if (storedUser) {
-    userData.value = JSON.parse(storedUser)
-    carregarHistorico()
+  const carregarPerfilEConteudo = async () => {
+    const storedUser = sessionStorage.getItem('userProfile')
 
-    if (JSON.parse(storedUser)?.cargo === 'especialista') {
-      carregarVinculos()
+    if (!storedUser) {
+      router.push('/login')
+      loading.value = false
+      return
     }
-  } else {
-    // Se não houver dados, redireciona para login
-    router.push('/login')
+
+    const parsedUser = JSON.parse(storedUser)
+
+    try {
+      const userUid = parsedUser?.uid
+      if (userUid && (!parsedUser.cargo || parsedUser.cargo === 'paciente')) {
+        const userDoc = await getDoc(doc(db, 'usuarios', userUid))
+        if (userDoc.exists()) {
+          const userDocData = userDoc.data() || {}
+          parsedUser.cargo = userDocData.cargo || parsedUser.cargo
+          parsedUser.nome = userDocData.nome || parsedUser.nome
+          parsedUser.foto = userDocData.foto || parsedUser.foto
+          sessionStorage.setItem('userProfile', JSON.stringify(parsedUser))
+        }
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel atualizar o perfil do usuario a partir do Firestore:', error)
+    }
+
+    userData.value = parsedUser
+    await carregarHistorico()
+
+    // Garantir que o auth.currentUser esteja disponível antes de chamar endpoints protegidos
+    const waitForAuthUser = () => new Promise((resolve) => {
+      if (auth.currentUser) return resolve(auth.currentUser)
+      const unsub = onAuthStateChanged(auth, (user) => {
+        unsub()
+        resolve(user)
+      })
+      // fallback em 5s
+      setTimeout(() => resolve(auth.currentUser), 5000)
+    })
+
+    await waitForAuthUser()
+
+    if (parsedUser?.cargo === 'especialista') {
+      await carregarVinculos()
+    }
+
+    loading.value = false
   }
-  
-  loading.value = false
+
+  carregarPerfilEConteudo()
 })
 
 const handleLogout = async () => {
@@ -402,12 +450,14 @@ const baixarRegistro = (registro) => {
                     </div>
                     <div class="text-sm text-slate-500 sm:text-right">
                       <p>{{ paciente.testsCount || 0 }} teste(s)</p>
-                      <p>Vinculado em {{ formatarDataHora(paciente.linkedAtMs) }}</p>
+                      <p>
+                        Status:
+                        <span :class="obterStatusOtimo(paciente) === 'Ótimo' ? 'text-emerald-700 font-bold' : 'text-slate-700 font-semibold'">
+                          {{ obterStatusOtimo(paciente) }}
+                        </span>
+                      </p>
                     </div>
                   </div>
-                  <p class="mt-3 text-sm text-slate-700">
-                    Último teste: {{ paciente.latestTest ? `${paciente.latestTest.testName} · ${formatarDataHora(paciente.latestTest.createdAtMs)}` : 'Nenhum teste registrado' }}
-                  </p>
                 </button>
               </div>
             </div>

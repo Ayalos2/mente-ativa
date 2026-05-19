@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
 import { signInWithEmailAndPassword } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { db } from '../config/firebase'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
@@ -26,6 +26,19 @@ const realizarLogin = async () => {
       nome: displayName,
       provedor: 'email',
       uid: firebaseSession.user.uid,
+      cargo: 'paciente',
+    }
+
+    try {
+      const userDocRef = doc(db, 'usuarios', firebaseSession.user.uid)
+      const userDoc = await getDoc(userDocRef)
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        userProfile.cargo = data.cargo || userProfile.cargo
+        userProfile.nome = data.nome || userProfile.nome
+      }
+    } catch (err) {
+      console.warn('Nao foi possivel ler o documento do usuario para carregar cargo:', err)
     }
 
     sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
@@ -56,21 +69,35 @@ const lidarComSucessoGoogle = async (resultado) => {
       provedor: 'google',
       uid: resultado.user.uid,
       foto: resultado.user.foto || resultado.user.photoURL || null,
+      cargo: 'paciente',
+    }
+
+    try {
+      const userDocRef = doc(db, 'usuarios', resultado.user.uid)
+      const userDoc = await getDoc(userDocRef)
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        userProfile.cargo = data.cargo || userProfile.cargo
+        userProfile.nome = data.nome || userProfile.nome
+        userProfile.foto = data.foto || userProfile.foto
+      }
+
+      // Garantir que exista/atualizar o documento do usuário no Firestore
+      await setDoc(userDocRef, {
+        uid: resultado.user.uid,
+        email: resultado.user.email,
+        nome: userProfile.nome,
+        cargo: userProfile.cargo,
+        foto: userProfile.foto,
+        provedor: 'google',
+        createdAtMs: Date.now(),
+        createdAtIso: new Date().toISOString(),
+      }, { merge: true })
+    } catch (error) {
+      console.warn('Falha ao acessar/atualizar documento usuario:', error)
     }
 
     sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
-
-    await setDoc(doc(db, 'usuarios', resultado.user.uid), {
-      uid: resultado.user.uid,
-      email: resultado.user.email,
-      nome: userProfile.nome,
-      cargo: resultado.user.cargo || 'paciente',
-      foto: userProfile.foto,
-      provedor: 'google',
-      createdAtMs: Date.now(),
-      createdAtIso: new Date().toISOString(),
-    }, { merge: true })
-
     router.push(route.query.redirect || '/profile')
   } catch (error) {
     console.error('Falha no login Google:', error)

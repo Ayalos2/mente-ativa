@@ -31,17 +31,14 @@ def listar_historico_teste(user_key: str, limit_count: int = 20):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    query = (
-        client.collection(COLLECTION_NAME)
-        .where("userKey", "==", user_key)
-        .order_by("createdAtMs", direction=firestore.Query.DESCENDING)
-        .limit(limit_count)
-    )
-
     resultados = []
+    query = client.collection(COLLECTION_NAME).where("userKey", "==", user_key)
+
     for documento in query.stream():
         data = documento.to_dict() or {}
         data["id"] = documento.id
         resultados.append(data)
 
-    return resultados
+    resultados.sort(key=lambda item: item.get("createdAtMs") or 0, reverse=True)
+
+    return resultados[:limit_count]

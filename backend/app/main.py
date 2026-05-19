@@ -105,7 +105,7 @@ def init_database():
 @app.get("/")
 def home():
     return {
-        "mensagem": "API Mente Ativa conectada ao Supabase!",
+        "mensagem": "API Mente Ativa conectada ao Firebase!",
         "status": "Online"
     }
 
@@ -114,9 +114,19 @@ def home():
 def test_db(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
-        return {"status": "Conexão com Supabase bem-sucedida!"}
+        return {"status": "Conexão com banco de dados bem-sucedida!"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=503, detail=f"Falha na conexão com banco: {str(e)}")
+
+
+@app.get('/firebase/status')
+def firebase_status():
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {"status": "sucesso", "project": os.getenv("FIREBASE_PROJECT_ID")}
 
 
 @app.post("/tests/results")
@@ -287,13 +297,9 @@ def listar_pacientes_do_medico(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    query = (
-        client.collection("vinculos_medico_paciente")
-        .where("doctorUid", "==", doctor_uid)
-        .order_by("createdAtMs", direction=firestore.Query.DESCENDING)
-    )
-
     pacientes = []
+    query = client.collection("vinculos_medico_paciente").where("doctorUid", "==", doctor_uid)
+
     for documento in query.stream():
         link = documento.to_dict() or {}
         patient_uid = link.get("patientUid")
@@ -304,14 +310,19 @@ def listar_pacientes_do_medico(request: Request):
 
         pacientes.append({
             "linkId": documento.id,
+            "doctorUid": link.get("doctorUid"),
+            "doctorEmail": link.get("doctorEmail"),
             "patientUid": patient_uid,
             "patientEmail": link.get("patientEmail") or patient_profile.get("email"),
             "patientName": link.get("patientName") or patient_profile.get("nome") or link.get("patientEmail"),
             "patientPhoto": patient_profile.get("foto"),
             "linkedAtMs": link.get("createdAtMs"),
+            "linkedAtIso": link.get("createdAtIso"),
             "testsCount": len(listar_historico_teste(user_key=patient_uid, limit_count=200)),
             "latestTest": ultimo_teste,
         })
+
+    pacientes.sort(key=lambda item: item.get("linkedAtMs") or 0, reverse=True)
 
     return {
         "status": "sucesso",

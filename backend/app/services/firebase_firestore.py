@@ -17,6 +17,17 @@ def get_firestore_client():
             service_account_info = json.loads(service_account_json)
             firebase_credential = credentials.Certificate(service_account_info)
         elif service_account_path:
+            # Verifica se o arquivo realmente existe para dar um erro mais claro
+            if not os.path.isabs(service_account_path):
+                # caminho relativo ao diretório do backend
+                service_account_path = os.path.join(os.getcwd(), service_account_path)
+
+            if not os.path.exists(service_account_path):
+                raise RuntimeError(
+                    f"FIREBASE_SERVICE_ACCOUNT_PATH configurado, mas o arquivo nao foi encontrado: {service_account_path}.\n"
+                    "Baixe a chave do Service Account no Firebase Console e coloque o arquivo nesse caminho, ou use FIREBASE_SERVICE_ACCOUNT_JSON."
+                )
+
             firebase_credential = credentials.Certificate(service_account_path)
         else:
             raise RuntimeError(
