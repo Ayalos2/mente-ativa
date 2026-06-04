@@ -4,3 +4,12 @@
 __pycache__/
 *.pkl
 .vscode/
+# Firebase service account (keep out of VCS)
+backend/service-account.json
+
+# Python virtualenvs
+.venv/
+
+# Local env files
+.env.local
+.env.*.local

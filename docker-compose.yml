@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL
+      - FIREBASE_SERVICE_ACCOUNT_PATH
+      - FIREBASE_PROJECT_ID
+      - FIREBASE_API_KEY
+      - FRONTEND_ORIGIN=http://localhost:5173
+
+  frontend:
+    image: node:18
+    working_dir: /app
+    volumes:
+      - ./frontend/mente-ativa:/app
+    ports:
+      - "5173:5173"
+    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
