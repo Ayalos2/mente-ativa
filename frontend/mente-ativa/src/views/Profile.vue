@@ -9,7 +9,7 @@ import DiagnosticHistoryPanel from '../components/diagnostics/DiagnosticHistoryP
 import { carregarHistoricoTestes, formatarResultadoTeste } from '../services/testResults'
 import { getCurrentUserProfile } from '../services/sessionUser'
 import { downloadJson } from '../utils/downloadJson'
-import { carregarPacientesDoMedico, carregarTestesDoPaciente, vincularPacientePorEmail } from '../services/doctorLinks'
+import { carregarPacientesDoMedico, carregarResumoClinicoPaciente, carregarTestesDoPaciente, vincularPacientePorEmail } from '../services/doctorLinks'
 
 const router = useRouter()
 const userData = ref(null)
@@ -27,6 +27,10 @@ const pacienteSelecionado = ref(null)
 const testesPacienteSelecionado = ref([])
 const carregandoTestesPaciente = ref(false)
 const erroTestesPaciente = ref('')
+const resumoPacienteSelecionado = ref(null)
+const carregandoResumoPaciente = ref(false)
+const erroResumoPaciente = ref('')
+let selecaoPacienteToken = 0
 
 const totalTestes = computed(() => historicoTestes.value.length)
 const mediaPrecisao = computed(() => {
@@ -99,20 +103,54 @@ const obterStatusOtimo = (paciente) => {
 }
 
 const selecionarPaciente = async (paciente) => {
+  const tokenAtual = ++selecaoPacienteToken
   pacienteSelecionado.value = paciente
   carregandoTestesPaciente.value = true
+  carregandoResumoPaciente.value = true
   erroTestesPaciente.value = ''
+  erroResumoPaciente.value = ''
+  resumoPacienteSelecionado.value = null
 
   try {
-    const resposta = await carregarTestesDoPaciente(paciente.patientUid)
-    testesPacienteSelecionado.value = (resposta.data.tests || []).map((t) => formatarResultadoTeste(t))
-  } catch (error) {
-    console.error('Erro ao carregar testes do paciente:', error)
-    erroTestesPaciente.value = error?.response?.data?.detail || 'Nao foi possivel carregar os testes do paciente.'
-    testesPacienteSelecionado.value = []
+    const [testesResposta, resumoResposta] = await Promise.allSettled([
+      carregarTestesDoPaciente(paciente.patientUid),
+      carregarResumoClinicoPaciente(paciente.patientUid),
+    ])
+
+    if (tokenAtual !== selecaoPacienteToken) {
+      return
+    }
+
+    if (testesResposta.status === 'fulfilled') {
+      testesPacienteSelecionado.value = (testesResposta.value.data.tests || []).map((t) => formatarResultadoTeste(t))
+    } else {
+      console.error('Erro ao carregar testes do paciente:', testesResposta.reason)
+      erroTestesPaciente.value = testesResposta.reason?.response?.data?.detail || 'Nao foi possivel carregar os testes do paciente.'
+      testesPacienteSelecionado.value = []
+    }
+
+    if (resumoResposta.status === 'fulfilled') {
+      resumoPacienteSelecionado.value = resumoResposta.value.data
+    } else {
+      console.error('Erro ao carregar resumo clinico do paciente:', resumoResposta.reason)
+      erroResumoPaciente.value = resumoResposta.reason?.response?.data?.detail || 'Nao foi possivel gerar o resumo clinico.'
+      resumoPacienteSelecionado.value = null
+    }
   } finally {
-    carregandoTestesPaciente.value = false
+    if (tokenAtual === selecaoPacienteToken) {
+      carregandoTestesPaciente.value = false
+      carregandoResumoPaciente.value = false
+    }
   }
+}
+
+const limparPacienteSelecionado = () => {
+  selecaoPacienteToken += 1
+  pacienteSelecionado.value = null
+  testesPacienteSelecionado.value = []
+  resumoPacienteSelecionado.value = null
+  erroTestesPaciente.value = ''
+  erroResumoPaciente.value = ''
 }
 
 const carregarVinculos = async () => {
@@ -191,6 +229,14 @@ const baixarHistoricoPacienteSelecionado = (registro) => {
 }
 
 const recarregarHistoricoPacienteSelecionado = async () => {
+  if (!pacienteSelecionado.value) {
+    return
+  }
+
+  await selecionarPaciente(pacienteSelecionado.value)
+}
+
+const recarregarResumoPacienteSelecionado = async () => {
   if (!pacienteSelecionado.value) {
     return
   }
@@ -514,11 +560,83 @@ const baixarRegistro = (registro) => {
                       {{ testesPacienteSelecionado.length }} teste(s) exibido(s)
                     </div>
                     <button
-                      @click="() => { pacienteSelecionado = null; testesPacienteSelecionado = [] }"
+                      @click="limparPacienteSelecionado"
                       class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-semibold transition-all"
                     >
                       Fechar
                     </button>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p class="text-xs font-black uppercase tracking-[0.25em] text-amber-700">Resumo automático</p>
+                      <h4 class="mt-1 text-lg font-bold text-slate-900">Leitura clínica do histórico</h4>
+                    </div>
+                    <div class="flex flex-col items-start gap-1 text-xs text-slate-600 sm:items-end">
+                      <span class="rounded-full bg-white px-3 py-1 font-bold text-amber-700 ring-1 ring-amber-200">
+                        {{ resumoPacienteSelecionado?.source === 'llm' ? 'LLM ativo' : 'Fallback local' }}
+                      </span>
+                      <span v-if="resumoPacienteSelecionado?.model" class="font-medium">
+                        Modelo: {{ resumoPacienteSelecionado.model }}
+                      </span>
+                      <button
+                        @click="recarregarResumoPacienteSelecionado"
+                        :disabled="carregandoResumoPaciente"
+                        class="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {{ carregandoResumoPaciente ? 'Gerando...' : 'Atualizar resumo' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="carregandoResumoPaciente" class="mt-4 flex items-center gap-3 rounded-xl bg-white/80 px-4 py-3 text-sm text-slate-600">
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-amber-600"></div>
+                    Gerando resumo com base nos dados coletados do paciente...
+                  </div>
+
+                  <p v-else-if="erroResumoPaciente" class="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {{ erroResumoPaciente }}
+                  </p>
+
+                  <div v-else-if="resumoPacienteSelecionado?.summary" class="mt-4 space-y-4">
+                    <p class="text-slate-800">
+                      {{ resumoPacienteSelecionado.summary.overview }}
+                    </p>
+
+                    <div class="grid gap-3 md:grid-cols-3">
+                      <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                        <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Tendências</p>
+                        <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                          <li v-for="item in resumoPacienteSelecionado.summary.trends || []" :key="item">{{ item }}</li>
+                        </ul>
+                      </div>
+
+                      <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                        <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Alertas</p>
+                        <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                          <li v-for="item in resumoPacienteSelecionado.summary.alerts || []" :key="item">{{ item }}</li>
+                        </ul>
+                      </div>
+
+                      <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                        <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Recomendações</p>
+                        <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                          <li v-for="item in resumoPacienteSelecionado.summary.recommendations || []" :key="item">{{ item }}</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2 rounded-xl bg-white px-4 py-3 text-xs text-slate-600 ring-1 ring-amber-100 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <span><strong class="text-slate-900">Confiança:</strong> {{ resumoPacienteSelecionado.summary.confidence || 'media' }}</span>
+                      <span><strong class="text-slate-900">Testes analisados:</strong> {{ resumoPacienteSelecionado.testsAnalyzed || 0 }}</span>
+                      <span><strong class="text-slate-900">Gerado em:</strong> {{ formatarDataHora(resumoPacienteSelecionado.generatedAtMs || resumoPacienteSelecionado.generatedAtIso) }}</span>
+                    </div>
+
+                    <p class="text-xs text-slate-500">
+                      {{ resumoPacienteSelecionado.summary.disclaimer || 'Resumo automatizado de apoio ao medico.' }}
+                    </p>
                   </div>
                 </div>
 

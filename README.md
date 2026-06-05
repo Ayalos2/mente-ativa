@@ -25,6 +25,15 @@ pip install -r backend/requirements.txt
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+4. Opcional: habilite o resumo por LLM para o painel médico
+
+```powershell
+setx GEMINI_API_KEY "sua-chave"
+setx GEMINI_MODEL "gemini-2.5-flash"
+```
+
+Sem essa chave, o sistema usa um resumo local conservador como fallback.
+
 ## Frontend (local)
 
 ```bash

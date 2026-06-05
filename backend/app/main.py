@@ -9,6 +9,7 @@ from firebase_admin import firestore
 from .database import engine, Base, get_db
 from .services.firebase_auth import verify_firebase_token
 from .services.firebase_firestore import get_firestore_client
+from .services.llm_summary import gerar_resumo_clinico_paciente
 from .services.test_results import listar_historico_teste, salvar_resultado_teste
 
 app = FastAPI(title="Mente Ativa API")
@@ -327,6 +328,43 @@ def listar_pacientes_do_medico(request: Request):
     return {
         "status": "sucesso",
         "patients": pacientes,
+    }
+
+
+@app.get("/doctor-links/patients/{patient_uid}/summary")
+def resumir_paciente_para_medico(patient_uid: str, request: Request):
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
+    patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
+    historico = listar_historico_teste(user_key=patient_uid, limit_count=20)
+    resumo = gerar_resumo_clinico_paciente(
+        patient_profile=patient_profile,
+        historico_testes=historico,
+    )
+
+    return {
+        "status": "sucesso",
+        "patientUid": patient_uid,
+        "patientName": patient_profile.get("nome") or patient_profile.get("email") or patient_uid,
+        "patientEmail": patient_profile.get("email"),
+        **resumo,
     }
 
 

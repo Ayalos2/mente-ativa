@@ -13,6 +13,8 @@ Passos rápidos:
   - `FIREBASE_SERVICE_ACCOUNT_PATH=./service-account.json`
   - `FIREBASE_PROJECT_ID=<seu-project-id>`
   - `FIREBASE_API_KEY=<sua-web-api-key>`
+  - `GEMINI_API_KEY=<sua-chave-opcional-para-resumo-ia>`
+  - `GEMINI_MODEL=gemini-2.5-flash`
 
 3) Reiniciar backend
 - No diretório `backend/` rode seu servidor (uvicorn):

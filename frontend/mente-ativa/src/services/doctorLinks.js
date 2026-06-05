@@ -43,6 +43,14 @@ export const carregarTestesDoPaciente = async (patientUid) => {
   })
 }
 
+export const carregarResumoClinicoPaciente = async (patientUid) => {
+  const headers = await getAuthHeaders()
+
+  return axios.get(`${apiBaseUrl}/doctor-links/patients/${patientUid}/summary`, {
+    headers,
+  })
+}
+
 export const requestLinkDoctor = async (doctorUid) => {
   const headers = await getAuthHeaders()
 

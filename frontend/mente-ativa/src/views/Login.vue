@@ -15,6 +15,10 @@ const email = ref('')
 const senha = ref('')
 const carregando = ref(false)
 
+const mostrarErroLoginGoogle = () => {
+  window.alert('Falha no login Google. Verifique a configuracao do Firebase.')
+}
+
 const realizarLogin = async () => {
   carregando.value = true
   try {
@@ -196,7 +200,7 @@ const lidarComSucessoGoogle = async (resultado) => {
         </div>
 
         <div class="flex justify-center">
-          <GoogleLoginButton @success="lidarComSucessoGoogle" @error="() => alert('Falha no login Google. Verifique a configuracao do Firebase.')" />
+          <GoogleLoginButton @success="lidarComSucessoGoogle" @error="mostrarErroLoginGoogle" />
         </div>
 
         <div class="mt-6">
