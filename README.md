@@ -2,6 +2,15 @@
 
 Resumo rápido de como rodar localmente e usar os recursos adicionados.
 
+## Tecnologias
+
+- **Backend:** Python 3.11, FastAPI, Uvicorn, SQLAlchemy, PostgreSQL (psycopg2-binary), Pydantic, python-dotenv, firebase-admin, requests, Docker
+- **Frontend:** Vue 3, Vite, Vue Router, Axios, Firebase JS SDK, Tailwind CSS, PostCSS, Autoprefixer, Node.js/npm
+- **Dev / CI:** Docker Compose, GitHub Actions
+- **Serviços:** Firebase (Authentication, Firestore), integração com LLMs (opcional via variável de ambiente GEMINI_API_KEY)
+
+As dependências reais estão listadas em [backend/requirements.txt](backend/requirements.txt) e em [frontend/mente-ativa/package.json](frontend/mente-ativa/package.json).
+
 ## Backend (local)
 
 1. Copie o exemplo de env:
