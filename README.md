@@ -66,9 +66,3 @@ Adicionado workflow GitHub Actions em `.github/workflows/ci.yml` que faz checage
 - Nunca comite `backend/service-account.json`. Está no `.gitignore`.
 - Use segredos do CI para configurar variáveis sensíveis em deploy.
 
----
-
-Se quiser, posso:
-- Gerar um `Dockerfile` para o frontend e otimizar o `docker-compose` para produção;
-- Adicionar testes automatizados (backend + frontend) e configurar o CI para executá-los;
-- Criar issues/checklist detalhado com subtasks para as pendências.
