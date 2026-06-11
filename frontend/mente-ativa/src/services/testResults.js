@@ -1,8 +1,7 @@
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
-import { db, isFirebaseConfigured } from '../config/firebase'
+import axios from 'axios'
 import { getCurrentUserProfile, getUserKey } from './sessionUser'
 
-const COLLECTION_NAME = 'historico_testes'
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const toNumber = (value) => {
   const numericValue = Number(value)
@@ -18,19 +17,16 @@ export const salvarResultadoTeste = async ({
   responseLogs = [],
   exportPayload = null,
   structuredData = {},
+  questionResults = [],
   userProfile = getCurrentUserProfile(),
 }) => {
-  if (!isFirebaseConfigured || !db) {
-    return null
-  }
-
   const userKey = getUserKey(userProfile)
 
   if (!userKey) {
     return null
   }
 
-  return addDoc(collection(db, COLLECTION_NAME), {
+  return axios.post(`${apiBaseUrl}/tests/results`, {
     userKey,
     userEmail: userProfile?.email || null,
     userName: userProfile?.nome || null,
@@ -43,34 +39,25 @@ export const salvarResultadoTeste = async ({
     responseLogs,
     structuredData,
     exportPayload,
-    createdAtMs: Date.now(),
-    createdAtIso: new Date().toISOString(),
+    questionResults,
   })
 }
 
-export const carregarHistoricoTestes = async ({ userProfile = getCurrentUserProfile() } = {}) => {
-  if (!isFirebaseConfigured || !db) {
-    return []
-  }
-
+export const carregarHistoricoTestes = async ({ userProfile = getCurrentUserProfile(), limitCount = 20 } = {}) => {
   const userKey = getUserKey(userProfile)
 
   if (!userKey) {
     return []
   }
 
-  const resultado = await getDocs(
-    query(
-      collection(db, COLLECTION_NAME),
-      where('userKey', '==', userKey)
-    )
-  )
+  const resposta = await axios.get(`${apiBaseUrl}/tests/results`, {
+    params: {
+      userKey,
+      limit: limitCount,
+    },
+  })
 
-  return resultado.docs
-    .map((documento) => ({
-      id: documento.id,
-      ...documento.data(),
-    }))
+  return (resposta.data.resultados || [])
     .sort((a, b) => toNumber(b.createdAtMs) - toNumber(a.createdAtMs))
 }
 

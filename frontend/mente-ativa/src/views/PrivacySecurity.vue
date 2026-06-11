@@ -50,6 +50,7 @@ const baixarDados = () => {
 
 const limparSessaoLocal = async () => {
   sessionStorage.removeItem('userProfile')
+  sessionStorage.removeItem('firebaseIdToken')
 
   try {
     await signOut(auth)

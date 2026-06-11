@@ -203,7 +203,7 @@ import { runFlow } from 'genkit/beta/client';
 async function callHelloFlow() {
   try {
     const result = await runFlow({
-      url: 'http://127.0.0.1:3400/helloFlow', // Replace with your deployed flow's URL
+      url: 'http://localhost:3400/helloFlow', // Replace with your deployed flow's URL
       input: { name: 'Genkit User' },
     });
     console.log('Non-streaming result:', result.greeting);
@@ -223,7 +223,7 @@ import { streamFlow } from 'genkit/beta/client';
 async function streamHelloFlow() {
   try {
     const result = streamFlow({
-      url: 'http://127.0.0.1:3400/helloFlow', // Replace with your deployed flow's URL
+      url: 'http://localhost:3400/helloFlow', // Replace with your deployed flow's URL
       input: { name: 'Streaming User' },
     });
 

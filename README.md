@@ -31,7 +31,7 @@ pip install -r backend/requirements.txt
 3. Rode o servidor:
 
 ```powershell
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --reload --host localhost --port 8000
 ```
 
 4. Opcional: habilite o resumo por LLM para o painel médico

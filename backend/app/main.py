@@ -15,6 +15,7 @@ from .services.test_results import listar_historico_teste, salvar_resultado_test
 app = FastAPI(title="Mente Ativa API")
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+print(f"Origem do Front-end configurada no CORS: {FRONTEND_ORIGIN}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN],
@@ -205,9 +206,24 @@ def list_doctors_for_patient(patient_key: str):
 
 
 @app.get("/tests/results")
-def listar_resultados_teste_api(userKey: str, limit: int = 20):
-    resultados = listar_historico_teste(userKey=userKey, limit_count=limit)
-    return {"status": "sucesso", "resultados": resultados}
+def listar_resultados_teste_api(userKey: str, request: Request, limit: int = 20): # 1. Adicionei o request aqui
+    try:
+        # Se a função listar_historico_teste precisar do token, passe o request para ela:
+        # resultados = listar_historico_teste(userKey=userKey, limit_count=limit, request=request)
+        
+        resultados = listar_historico_teste(userKey=userKey, limit_count=limit)
+        
+        return {"status": "sucesso", "resultados": resultados}
+        
+    except Exception as exc:
+        # 2. Isso vai printar o erro EXATO no seu terminal Python para você ver
+        print(f"--- ERRO CRÍTICO NO BACKEND ---")
+        import traceback
+        traceback.print_exc() 
+        print(f"--------------------------------")
+        
+        # Retorna um erro formatado para o Vue não se perder no CORS
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 def _get_bearer_token(request: Request) -> str:

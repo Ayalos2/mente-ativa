@@ -8,6 +8,8 @@ import { auth } from '../config/firebase'
 import { db } from '../config/firebase'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
 
+const firebaseTokenStorageKey = 'firebaseIdToken'
+
 
 const router = useRouter()
 const route = useRoute()
@@ -46,6 +48,7 @@ const realizarLogin = async () => {
     }
 
     sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+    sessionStorage.setItem(firebaseTokenStorageKey, await firebaseSession.user.getIdToken())
 
     alert('Bem-vindo, ' + displayName)
     router.push(route.query.redirect || '/profile')
@@ -102,6 +105,7 @@ const lidarComSucessoGoogle = async (resultado) => {
     }
 
     sessionStorage.setItem('userProfile', JSON.stringify(userProfile))
+    sessionStorage.setItem(firebaseTokenStorageKey, resultado.token)
     router.push(route.query.redirect || '/profile')
   } catch (error) {
     console.error('Falha no login Google:', error)

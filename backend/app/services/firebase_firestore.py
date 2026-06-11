@@ -1,9 +1,13 @@
 import json
 import os
 from functools import lru_cache
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 @lru_cache(maxsize=1)
@@ -17,18 +21,18 @@ def get_firestore_client():
             service_account_info = json.loads(service_account_json)
             firebase_credential = credentials.Certificate(service_account_info)
         elif service_account_path:
-            # Verifica se o arquivo realmente existe para dar um erro mais claro
-            if not os.path.isabs(service_account_path):
-                # caminho relativo ao diretório do backend
-                service_account_path = os.path.join(os.getcwd(), service_account_path)
+            resolved_path = Path(service_account_path)
 
-            if not os.path.exists(service_account_path):
+            if not resolved_path.is_absolute():
+                resolved_path = BACKEND_ROOT / resolved_path
+
+            if not resolved_path.exists():
                 raise RuntimeError(
-                    f"FIREBASE_SERVICE_ACCOUNT_PATH configurado, mas o arquivo nao foi encontrado: {service_account_path}.\n"
+                    f"FIREBASE_SERVICE_ACCOUNT_PATH configurado, mas o arquivo nao foi encontrado: {resolved_path}.\n"
                     "Baixe a chave do Service Account no Firebase Console e coloque o arquivo nesse caminho, ou use FIREBASE_SERVICE_ACCOUNT_JSON."
                 )
 
-            firebase_credential = credentials.Certificate(service_account_path)
+            firebase_credential = credentials.Certificate(str(resolved_path))
         else:
             raise RuntimeError(
                 "FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_PATH nao configurado no backend"

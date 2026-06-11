@@ -11,6 +11,7 @@ Passos rápidos:
 - O backend lê `backend/.env` por padrão.
 - Garanta as variáveis abaixo configuradas:
   - `FIREBASE_SERVICE_ACCOUNT_PATH=./service-account.json`
+  - `FIREBASE_SERVICE_ACCOUNT_JSON=<json-em-uma-linha>` (opcional, alternativa ao arquivo)
   - `FIREBASE_PROJECT_ID=<seu-project-id>`
   - `FIREBASE_API_KEY=<sua-web-api-key>`
   - `GEMINI_API_KEY=<sua-chave-opcional-para-resumo-ia>`
@@ -22,12 +23,12 @@ Passos rápidos:
 ```powershell
 # ativar virtualenv (se aplicável)
 .\.venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --reload --host localhost --port 8000
 ```
 
 4) Testar conexão com Firestore
 - Acesse:
-  - `http://127.0.0.1:8000/firebase/status`
+  - `http://localhost:8000/firebase/status`
 - Se o service account estiver faltando ou inválido você verá uma mensagem de erro clara indicando o problema.
 
 5) Testar vincular paciente
@@ -49,4 +50,5 @@ Respostas esperadas:
 
 6) Observações de segurança
 - Nunca comite `service-account.json` no repositório.
+- O caminho `FIREBASE_SERVICE_ACCOUNT_PATH` é resolvido relativo ao diretório `backend/`.
 - Use segredos gerenciados em produção (Azure Key Vault, AWS Secrets Manager, etc.)

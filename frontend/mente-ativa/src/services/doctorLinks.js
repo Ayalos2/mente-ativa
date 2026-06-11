@@ -1,20 +1,49 @@
 import axios from 'axios'
+import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../config/firebase'
 
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const firebaseTokenStorageKey = 'firebaseIdToken'
+
+const waitForFirebaseUser = () => new Promise((resolve) => {
+  if (auth?.currentUser) {
+    resolve(auth.currentUser)
+    return
+  }
+
+  if (!auth) {
+    resolve(null)
+    return
+  }
+
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    unsubscribe()
+    resolve(user)
+  })
+
+  setTimeout(() => resolve(auth.currentUser), 4000)
+})
 
 const getAuthHeaders = async () => {
-  const currentUser = auth.currentUser
+  const storedToken = sessionStorage.getItem(firebaseTokenStorageKey)
+  const currentUser = auth?.currentUser || await waitForFirebaseUser()
 
-  if (!currentUser) {
-    throw new Error('Usuário não autenticado no Firebase')
+  if (currentUser) {
+    const token = await currentUser.getIdToken()
+    sessionStorage.setItem(firebaseTokenStorageKey, token)
+
+    return {
+      Authorization: `Bearer ${token}`,
+    }
   }
 
-  const token = await currentUser.getIdToken()
-
-  return {
-    Authorization: `Bearer ${token}`,
+  if (storedToken) {
+    return {
+      Authorization: `Bearer ${storedToken}`,
+    }
   }
+
+  throw new Error('Usuário não autenticado no Firebase')
 }
 
 export const vincularPacientePorEmail = async (patientEmail) => {

@@ -302,6 +302,7 @@ const handleLogout = async () => {
   try {
     await signOut(auth)
     sessionStorage.removeItem('userProfile')
+    sessionStorage.removeItem('firebaseIdToken')
     router.push('/login')
   } catch (error) {
     console.error('Erro ao fazer logout:', error)

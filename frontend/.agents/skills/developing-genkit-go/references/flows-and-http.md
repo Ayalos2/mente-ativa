@@ -126,7 +126,7 @@ mux := http.NewServeMux()
 for _, f := range genkit.ListFlows(g) {
 	mux.HandleFunc("POST /"+f.Name(), genkit.Handler(f))
 }
-log.Fatal(server.Start(ctx, "127.0.0.1:8080", mux))
+log.Fatal(server.Start(ctx, "localhost:8080", mux))
 ```
 
 ### Request/Response Format

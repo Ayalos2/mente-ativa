@@ -2,6 +2,7 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { auth, isFirebaseConfigured } from '../config/firebase'
 
 const googleProvider = new GoogleAuthProvider()
+const firebaseTokenStorageKey = 'firebaseIdToken'
 
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -15,6 +16,7 @@ export const loginComGoogle = async () => {
   const result = await signInWithPopup(auth, googleProvider)
 
   const token = await result.user.getIdToken()
+  sessionStorage.setItem(firebaseTokenStorageKey, token)
 
   return {
     token,
