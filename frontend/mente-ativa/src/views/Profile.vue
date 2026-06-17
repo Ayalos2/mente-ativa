@@ -9,7 +9,7 @@ import DiagnosticHistoryPanel from '../components/diagnostics/DiagnosticHistoryP
 import { carregarHistoricoTestes, formatarResultadoTeste } from '../services/testResults'
 import { getCurrentUserProfile } from '../services/sessionUser'
 import { downloadJson } from '../utils/downloadJson'
-import { carregarPacientesDoMedico, carregarResumoClinicoPaciente, carregarTestesDoPaciente, vincularPacientePorEmail } from '../services/doctorLinks'
+import { carregarPacientesDoMedico, carregarResumoClinicoPaciente, carregarTestesDoPaciente, vincularPacientePorEmail, carregarMeusMedicos } from '../services/doctorLinks'
 
 const router = useRouter()
 const userData = ref(null)
@@ -18,6 +18,10 @@ const historicoTestes = ref([])
 const carregandoHistorico = ref(false)
 const erroHistorico = ref('')
 const cargoEhEspecialista = computed(() => userData.value?.cargo === 'especialista')
+const cargoEhPaciente = computed(() => userData.value?.cargo === 'paciente' || !userData.value?.cargo)
+const meusMedicos = ref([])
+const carregandoMeusMedicos = ref(false)
+const erroMeusMedicos = ref('')
 const emailPacienteVinculo = ref('')
 const carregandoVinculos = ref(false)
 const erroVinculos = ref('')
@@ -180,6 +184,26 @@ const carregarVinculos = async () => {
   }
 }
 
+const carregarMeusMedicosDoServidor = async () => {
+  if (!cargoEhPaciente.value) {
+    return
+  }
+
+  carregandoMeusMedicos.value = true
+  erroMeusMedicos.value = ''
+
+  try {
+    const resposta = await carregarMeusMedicos()
+    meusMedicos.value = resposta.data.doctors || []
+  } catch (error) {
+    console.error('Erro ao carregar meus medicos:', error)
+    erroMeusMedicos.value = error?.response?.data?.detail || 'Nao foi possivel carregar os medicos vinculados.'
+    meusMedicos.value = []
+  } finally {
+    carregandoMeusMedicos.value = false
+  }
+}
+
 const vincularPaciente = async () => {
   erroVinculos.value = ''
 
@@ -290,6 +314,8 @@ onMounted(() => {
 
     if (parsedUser?.cargo === 'especialista') {
       await carregarVinculos()
+    } else {
+      await carregarMeusMedicosDoServidor()
     }
 
     loading.value = false
@@ -675,6 +701,69 @@ const baixarRegistro = (registro) => {
         </div>
 
         <!-- Histórico moved to separate view: /profile/historico -->
+
+        <!-- Meus Médicos (para pacientes) -->
+        <div v-if="cargoEhPaciente" class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
+          <div class="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900">Meus médicos</h2>
+              <p class="text-slate-600 mt-2">Profissionais de saúde vinculados ao seu perfil.</p>
+            </div>
+            <div class="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-4 py-2">
+              {{ meusMedicos.length }} vinculado(s)
+            </div>
+          </div>
+
+          <div v-if="carregandoMeusMedicos" class="flex items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
+          </div>
+
+          <div v-else-if="erroMeusMedicos" class="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            {{ erroMeusMedicos }}
+          </div>
+
+          <div v-else-if="meusMedicos.length === 0" class="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center">
+            <span class="text-4xl mb-3">👨‍⚕️</span>
+            <p class="text-lg font-bold text-slate-900">Nenhum médico vinculado</p>
+            <p class="text-sm text-slate-600 mt-1">Vá em "Editar Perfil" para buscar e solicitar vínculo com um profissional.</p>
+            <button
+              @click="router.push('/profile/edit')"
+              class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-bold transition-all"
+            >
+              Buscar médico
+            </button>
+          </div>
+
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              v-for="medico in meusMedicos"
+              :key="medico.doctorUid"
+              class="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                👨‍⚕️
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-900 truncate">{{ medico.doctorName }}</p>
+                <p class="text-sm text-slate-600 truncate">{{ medico.doctorEmail }}</p>
+                <div v-if="medico.doctorEspecialidade || medico.doctorInstituicao" class="mt-1 flex flex-wrap gap-2">
+                  <span v-if="medico.doctorEspecialidade" class="inline-block text-xs font-medium bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                    {{ medico.doctorEspecialidade }}
+                  </span>
+                  <span v-if="medico.doctorInstituicao" class="inline-block text-xs font-medium bg-purple-50 text-purple-700 rounded-full px-2 py-0.5">
+                    {{ medico.doctorInstituicao }}
+                  </span>
+                </div>
+                <div v-if="medico.doctorCrmcrp" class="mt-1 text-xs text-slate-500">
+                  {{ medico.doctorCrmcrp }}
+                </div>
+                <p v-if="medico.linkedAtIso" class="mt-1 text-xs text-slate-400">
+                  Vinculado em {{ formatarDataHora(medico.linkedAtIso) }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Settings Section -->
         <div class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">

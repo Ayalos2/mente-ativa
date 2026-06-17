@@ -89,3 +89,11 @@ export const requestLinkDoctor = async (doctorUid) => {
     { headers }
   )
 }
+
+export const carregarMeusMedicos = async () => {
+  const headers = await getAuthHeaders()
+
+  return axios.get(`${apiBaseUrl}/doctor-links/my-doctors`, {
+    headers,
+  })
+}

@@ -56,6 +56,9 @@ class TestResultSchema(BaseModel):
 class LinkPatientSchema(BaseModel):
     patientEmail: str
 
+class RequestDoctorLinkSchema(BaseModel):
+    doctorUid: str
+
 @app.post("/login")
 def login(dados: LoginSchema, db: Session = Depends(get_db)):
     # Busca o usuário no banco
@@ -352,6 +355,110 @@ def listar_pacientes_do_medico(request: Request):
     return {
         "status": "sucesso",
         "patients": pacientes,
+    }
+
+
+@app.get("/doctor-links/my-doctors")
+def listar_medicos_do_paciente(request: Request):
+    """Retorna a lista de médicos vinculados ao paciente autenticado."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    patient_info = verify_firebase_token(token)
+    patient_uid = patient_info.get("uid")
+    if not patient_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o paciente")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    medicos = []
+    query = client.collection("vinculos_medico_paciente").where("patientUid", "==", patient_uid)
+
+    for documento in query.stream():
+        link = documento.to_dict() or {}
+        doctor_uid = link.get("doctorUid")
+
+        # Busca dados do médico no Firestore
+        doctor_profile = _fetch_firestore_doc_by_uid("usuarios", doctor_uid) or {}
+
+        medicos.append({
+            "linkId": documento.id,
+            "doctorUid": doctor_uid,
+            "doctorEmail": link.get("doctorEmail") or doctor_profile.get("email"),
+            "doctorName": link.get("doctorName") or doctor_profile.get("nome") or link.get("doctorEmail"),
+            "doctorPhoto": doctor_profile.get("foto"),
+            "doctorEspecialidade": doctor_profile.get("especialidade"),
+            "doctorInstituicao": doctor_profile.get("instituicao"),
+            "doctorCrmcrp": doctor_profile.get("crmcrp"),
+            "linkedAtMs": link.get("createdAtMs"),
+            "linkedAtIso": link.get("createdAtIso"),
+        })
+
+    medicos.sort(key=lambda item: item.get("linkedAtMs") or 0, reverse=True)
+
+    return {
+        "status": "sucesso",
+        "doctors": medicos,
+    }
+
+
+@app.post("/doctor-links/request")
+def solicitar_vinculo_medico(payload: RequestDoctorLinkSchema, request: Request):
+    """Paciente solicita vínculo com um médico especialista."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    patient_info = verify_firebase_token(token)
+    patient_uid = patient_info.get("uid")
+    if not patient_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o paciente")
+
+    doctor_uid = payload.doctorUid
+    if not doctor_uid:
+        raise HTTPException(status_code=400, detail="doctorUid é obrigatorio")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Verifica se o médico existe
+    doctor_profile = _fetch_firestore_doc_by_uid("usuarios", doctor_uid)
+    if not doctor_profile:
+        raise HTTPException(status_code=404, detail="Médico nao encontrado")
+
+    # Verifica se o médico é especialista
+    if doctor_profile.get("cargo") != "especialista":
+        raise HTTPException(status_code=400, detail="O usuario informado nao é um especialista")
+
+    # Busca dados do paciente
+    patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
+
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    now_ms = int(__import__("time").time() * 1000)
+    now_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+    documento_vinculo = {
+        "doctorUid": doctor_uid,
+        "doctorEmail": doctor_profile.get("email"),
+        "doctorName": doctor_profile.get("nome") or doctor_profile.get("email"),
+        "patientUid": patient_uid,
+        "patientEmail": patient_info.get("email"),
+        "patientName": patient_profile.get("nome") or patient_info.get("email"),
+        "createdAtMs": now_ms,
+        "createdAtIso": now_iso,
+    }
+
+    client.collection("vinculos_medico_paciente").document(vinculo_id).set(documento_vinculo, merge=True)
+
+    return {
+        "status": "sucesso",
+        "vinculo": documento_vinculo,
     }
 
 
