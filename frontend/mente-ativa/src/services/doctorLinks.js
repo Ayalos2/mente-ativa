@@ -97,3 +97,19 @@ export const carregarMeusMedicos = async () => {
     headers,
   })
 }
+
+export const carregarMeuResumoSaude = async () => {
+  const headers = await getAuthHeaders()
+
+  return axios.get(`${apiBaseUrl}/doctor-links/my-health-summary`, {
+    headers,
+  })
+}
+
+export const gerarMeuResumoSaude = async () => {
+  const headers = await getAuthHeaders()
+
+  return axios.post(`${apiBaseUrl}/doctor-links/my-health-summary/generate`, {}, {
+    headers,
+  })
+}

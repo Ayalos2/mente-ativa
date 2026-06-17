@@ -336,6 +336,9 @@ def listar_pacientes_do_medico(request: Request):
         historico = listar_historico_teste(user_key=patient_uid, limit_count=1)
         ultimo_teste = historico[0] if historico else None
 
+        # Busca resumo de saúde salvo pelo paciente
+        resumo_saude = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
+
         pacientes.append({
             "linkId": documento.id,
             "doctorUid": link.get("doctorUid"),
@@ -348,6 +351,9 @@ def listar_pacientes_do_medico(request: Request):
             "linkedAtIso": link.get("createdAtIso"),
             "testsCount": len(listar_historico_teste(user_key=patient_uid, limit_count=200)),
             "latestTest": ultimo_teste,
+            "healthSummary": resumo_saude.get("summary") if resumo_saude else None,
+            "healthSummaryGeneratedAt": resumo_saude.get("generatedAtIso") if resumo_saude else None,
+            "healthSummarySource": resumo_saude.get("source") if resumo_saude else None,
         })
 
     pacientes.sort(key=lambda item: item.get("linkedAtMs") or 0, reverse=True)
@@ -459,6 +465,94 @@ def solicitar_vinculo_medico(payload: RequestDoctorLinkSchema, request: Request)
     return {
         "status": "sucesso",
         "vinculo": documento_vinculo,
+    }
+
+
+@app.get("/doctor-links/my-health-summary")
+def meu_resumo_saude(request: Request):
+    """Paciente visualiza seu proprio resumo de saúde salvo."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    patient_info = verify_firebase_token(token)
+    patient_uid = patient_info.get("uid")
+    if not patient_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o paciente")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
+
+    # Busca resumo salvo
+    resumo_salvo = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
+
+    if not resumo_salvo:
+        return {
+            "status": "sucesso",
+            "hasSummary": False,
+            "patientUid": patient_uid,
+            "patientName": patient_profile.get("nome") or patient_info.get("email"),
+        }
+
+    return {
+        "status": "sucesso",
+        "hasSummary": True,
+        "patientUid": patient_uid,
+        "patientName": patient_profile.get("nome") or patient_info.get("email"),
+        "summary": resumo_salvo.get("summary"),
+        "source": resumo_salvo.get("source"),
+        "generatedAtIso": resumo_salvo.get("generatedAtIso"),
+        "testsAnalyzed": resumo_salvo.get("testsAnalyzed"),
+    }
+
+
+@app.post("/doctor-links/my-health-summary/generate")
+def gerar_meu_resumo_saude(request: Request):
+    """Paciente gera e salva seu resumo de saúde baseado nos testes."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    patient_info = verify_firebase_token(token)
+    patient_uid = patient_info.get("uid")
+    if not patient_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o paciente")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
+    historico = listar_historico_teste(user_key=patient_uid, limit_count=20)
+
+    if not historico:
+        raise HTTPException(status_code=400, detail="Você precisa ter pelo menos um teste realizado para gerar o resumo.")
+
+    resumo = gerar_resumo_clinico_paciente(
+        patient_profile=patient_profile,
+        historico_testes=historico,
+    )
+
+    # Salva no Firestore
+    documento_resumo = {
+        "patientUid": patient_uid,
+        "patientName": patient_profile.get("nome") or patient_info.get("email"),
+        "patientEmail": patient_info.get("email"),
+        **resumo,
+        "updatedAtMs": int(__import__("time").time() * 1000),
+    }
+
+    client.collection("resumos_saude_paciente").document(patient_uid).set(documento_resumo, merge=True)
+
+    return {
+        "status": "sucesso",
+        "patientUid": patient_uid,
+        **resumo,
     }
 
 

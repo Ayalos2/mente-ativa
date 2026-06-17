@@ -9,7 +9,7 @@ import DiagnosticHistoryPanel from '../components/diagnostics/DiagnosticHistoryP
 import { carregarHistoricoTestes, formatarResultadoTeste } from '../services/testResults'
 import { getCurrentUserProfile } from '../services/sessionUser'
 import { downloadJson } from '../utils/downloadJson'
-import { carregarPacientesDoMedico, carregarResumoClinicoPaciente, carregarTestesDoPaciente, vincularPacientePorEmail, carregarMeusMedicos } from '../services/doctorLinks'
+import { carregarPacientesDoMedico, carregarResumoClinicoPaciente, carregarTestesDoPaciente, vincularPacientePorEmail, carregarMeusMedicos, carregarMeuResumoSaude, gerarMeuResumoSaude } from '../services/doctorLinks'
 
 const router = useRouter()
 const userData = ref(null)
@@ -22,6 +22,11 @@ const cargoEhPaciente = computed(() => userData.value?.cargo === 'paciente' || !
 const meusMedicos = ref([])
 const carregandoMeusMedicos = ref(false)
 const erroMeusMedicos = ref('')
+const resumoPaciente = ref(null)
+const carregandoResumoPacienteProprio = ref(false)
+const erroResumoPacienteProprio = ref('')
+const gerandoResumoPaciente = ref(false)
+const resumoJaExiste = ref(false)
 const emailPacienteVinculo = ref('')
 const carregandoVinculos = ref(false)
 const erroVinculos = ref('')
@@ -204,6 +209,44 @@ const carregarMeusMedicosDoServidor = async () => {
   }
 }
 
+const carregarMeuResumoSaudeDoServidor = async () => {
+  if (!cargoEhPaciente.value) return
+
+  carregandoResumoPacienteProprio.value = true
+  erroResumoPacienteProprio.value = ''
+  resumoPaciente.value = null
+  resumoJaExiste.value = false
+
+  try {
+    const resposta = await carregarMeuResumoSaude()
+    if (resposta.data.hasSummary) {
+      resumoPaciente.value = resposta.data
+      resumoJaExiste.value = true
+    }
+  } catch (error) {
+    console.error('Erro ao carregar resumo de saude:', error)
+    erroResumoPacienteProprio.value = error?.response?.data?.detail || ''
+  } finally {
+    carregandoResumoPacienteProprio.value = false
+  }
+}
+
+const gerarMeuResumoSaudeDoServidor = async () => {
+  gerandoResumoPaciente.value = true
+  erroResumoPacienteProprio.value = ''
+
+  try {
+    const resposta = await gerarMeuResumoSaude()
+    resumoPaciente.value = resposta.data
+    resumoJaExiste.value = true
+  } catch (error) {
+    console.error('Erro ao gerar resumo de saude:', error)
+    erroResumoPacienteProprio.value = error?.response?.data?.detail || 'Nao foi possivel gerar o resumo.'
+  } finally {
+    gerandoResumoPaciente.value = false
+  }
+}
+
 const vincularPaciente = async () => {
   erroVinculos.value = ''
 
@@ -316,6 +359,7 @@ onMounted(() => {
       await carregarVinculos()
     } else {
       await carregarMeusMedicosDoServidor()
+      await carregarMeuResumoSaudeDoServidor()
     }
 
     loading.value = false
@@ -701,6 +745,116 @@ const baixarRegistro = (registro) => {
         </div>
 
         <!-- Histórico moved to separate view: /profile/historico -->
+
+        <!-- Meu Resumo de Saúde (para pacientes) -->
+        <div v-if="cargoEhPaciente" class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
+          <div class="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900">Meu Resumo de Saúde</h2>
+              <p class="text-slate-600 mt-2">Resumo gerado automaticamente com base nos seus testes cognitivos. Compartilhado com seus médicos vinculados.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div v-if="resumoJaExiste" class="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-4 py-2">
+                Resumo disponível
+              </div>
+              <div v-else class="text-sm font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-full px-4 py-2">
+                Não gerado
+              </div>
+            </div>
+          </div>
+
+          <div v-if="carregandoResumoPacienteProprio" class="flex items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <div class="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-emerald-600"></div>
+          </div>
+
+          <div v-else-if="erroResumoPacienteProprio && !gerandoResumoPaciente" class="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            {{ erroResumoPacienteProprio }}
+          </div>
+
+          <div v-else-if="!resumoJaExiste" class="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center">
+            <span class="text-4xl mb-3">📋</span>
+            <p class="text-lg font-bold text-slate-900">Nenhum resumo gerado ainda</p>
+            <p class="text-sm text-slate-600 mt-1 max-w-md">
+              Gere um resumo de saúde baseado nos seus testes cognitivos. Ele ficará visível para os médicos vinculados a você.
+            </p>
+            <button
+              v-if="totalTestes > 0"
+              @click="gerarMeuResumoSaudeDoServidor"
+              :disabled="gerandoResumoPaciente"
+              class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ gerandoResumoPaciente ? 'Gerando...' : 'Gerar resumo de saúde' }}
+            </button>
+            <p v-else class="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2">
+              Realize pelo menos um teste cognitivo para gerar o resumo.
+            </p>
+          </div>
+
+          <div v-else-if="resumoPaciente?.summary" class="space-y-4">
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.25em] text-amber-700">Resumo automático</p>
+                  <h4 class="mt-1 text-lg font-bold text-slate-900">Leitura clínica do seu histórico</h4>
+                </div>
+                <div class="flex flex-col items-start gap-1 text-xs text-slate-600 sm:items-end">
+                  <span class="rounded-full bg-white px-3 py-1 font-bold text-amber-700 ring-1 ring-amber-200">
+                    {{ resumoPaciente.source === 'llm' ? 'LLM ativo' : 'Fallback local' }}
+                  </span>
+                  <button
+                    @click="gerarMeuResumoSaudeDoServidor"
+                    :disabled="gerandoResumoPaciente"
+                    class="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {{ gerandoResumoPaciente ? 'Gerando...' : 'Regenerar resumo' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="gerandoResumoPaciente" class="mt-4 flex items-center gap-3 rounded-xl bg-white/80 px-4 py-3 text-sm text-slate-600">
+                <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-amber-600"></div>
+                Gerando resumo com base nos seus dados...
+              </div>
+
+              <div v-else class="mt-4 space-y-4">
+                <p class="text-slate-800">{{ resumoPaciente.summary.overview }}</p>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                  <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Tendências</p>
+                    <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                      <li v-for="item in resumoPaciente.summary.trends || []" :key="item">{{ item }}</li>
+                    </ul>
+                  </div>
+
+                  <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Alertas</p>
+                    <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                      <li v-for="item in resumoPaciente.summary.alerts || []" :key="item">{{ item }}</li>
+                    </ul>
+                  </div>
+
+                  <div class="rounded-xl bg-white p-4 ring-1 ring-amber-100">
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-700">Recomendações</p>
+                    <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                      <li v-for="item in resumoPaciente.summary.recommendations || []" :key="item">{{ item }}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-2 rounded-xl bg-white px-4 py-3 text-xs text-slate-600 ring-1 ring-amber-100 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <span><strong class="text-slate-900">Confiança:</strong> {{ resumoPaciente.summary.confidence || 'media' }}</span>
+                  <span><strong class="text-slate-900">Testes analisados:</strong> {{ resumoPaciente.testsAnalyzed || 0 }}</span>
+                  <span v-if="resumoPaciente.generatedAtIso"><strong class="text-slate-900">Gerado em:</strong> {{ formatarDataHora(resumoPaciente.generatedAtIso) }}</span>
+                </div>
+
+                <p class="text-xs text-slate-500">
+                  Este resumo fica visível para os médicos vinculados ao seu perfil.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Meus Médicos (para pacientes) -->
         <div v-if="cargoEhPaciente" class="bg-white rounded-2xl shadow-md p-8 border border-slate-200">
