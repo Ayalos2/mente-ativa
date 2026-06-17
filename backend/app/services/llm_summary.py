@@ -201,9 +201,15 @@ def _build_prompt(patient_profile, historico_testes):
         "Voce e um assistente clinico para apoio ao medico. "
         "Use somente os dados fornecidos abaixo, sem inventar diagnosticos. "
         "Nao substitua a avaliacao profissional e evite linguagem alarmista. "
-        "Responda APENAS com JSON valido e com estas chaves: "
-        "title, overview, confidence, trends, alerts, recommendations, disclaimer. "
-        "Cada uma das listas deve conter apenas strings curtas. "
+        "Responda EXCLUSIVAMENTE com JSON valido e com este formato: "
+        "title: string, "
+        "overview: string (um paragrafo descritivo), "
+        "confidence: string (texto descrevendo o nivel de confianca, NAO use lista), "
+        "trends: array de strings curtas, "
+        "alerts: array de strings curtas, "
+        "recommendations: array de strings curtas, "
+        "disclaimer: string. "
+        "Nao use caracteres de escape desnecessarios. "
         "Se faltarem dados, explique isso de forma conservadora. "
         f"Dados do paciente: {json.dumps(payload, ensure_ascii=True)}"
     )
@@ -261,7 +267,7 @@ def _call_gemini(patient_profile, historico_testes):
         "generationConfig": {
             "temperature": 0.2,
             "topP": 0.9,
-            "maxOutputTokens": 900,
+            "maxOutputTokens": 8192,
             "responseMimeType": "application/json",
         },
     }
