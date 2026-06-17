@@ -14,11 +14,18 @@ from .services.test_results import listar_historico_teste, salvar_resultado_test
 
 app = FastAPI(title="Mente Ativa API")
 
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-print(f"Origem do Front-end configurada no CORS: {FRONTEND_ORIGIN}")
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173").strip("/")
+
+# Lista de origens permitidas baseada na variável de ambiente
+origins = [
+    FRONTEND_ORIGIN,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN],
+    allow_origins=origins,  # Passa a lista aqui
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -211,7 +218,7 @@ def listar_resultados_teste_api(userKey: str, request: Request, limit: int = 20)
         # Se a função listar_historico_teste precisar do token, passe o request para ela:
         # resultados = listar_historico_teste(userKey=userKey, limit_count=limit, request=request)
         
-        resultados = listar_historico_teste(userKey=userKey, limit_count=limit)
+        resultados = listar_historico_teste(user_key=userKey, limit_count=limit)
         
         return {"status": "sucesso", "resultados": resultados}
         
@@ -248,6 +255,7 @@ def _fetch_firestore_doc_by_uid(collection_name: str, uid: str):
 @app.post("/doctor-links/link")
 def vincular_paciente_medico(payload: LinkPatientSchema, request: Request):
     token = _get_bearer_token(request)
+    print(f"👉 TOKEN RECEBIDO NO BACKEND: {token}") # <--- Adicione isso para debugar
     if not token:
         raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
 
