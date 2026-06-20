@@ -1,25 +1,14 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import AppButton from '../components/base/AppButton.vue'
+import AppCard from '../components/base/AppCard.vue'
 
-// Inicializa o roteador para gerenciar a navegação entre as telas
 const router = useRouter()
 
-// Funções de navegação para os botões principais
-const irParaTeste = () => {
-  router.push('/testes')
-}
-
-const irParaLogin = () => {
-  router.push('/login')
-}
-
-const irParaCadastro = () => {
-  router.push('/cadastro')
-}
-
-const irParaPainelMedico = () => {
-  router.push('/profile')
-}
+const irParaTeste = () => router.push('/testes')
+const irParaLogin = () => router.push('/login')
+const irParaCadastro = () => router.push('/cadastro')
+const irParaPainelMedico = () => router.push('/profile')
 </script>
 
 <template>
@@ -73,20 +62,24 @@ const irParaPainelMedico = () => {
         </p>
 
         <div class="flex flex-col sm:flex-row gap-5 justify-center items-center">
-          <button 
+          <AppButton 
             @click="irParaTeste"
-            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-12 py-5 rounded-2xl text-xl font-bold transition-all shadow-lg shadow-emerald-200 active:scale-95 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+            variant="primary"
+            size="lg"
+            class="w-full sm:w-auto"
             aria-label="Iniciar um novo teste cognitivo"
           >
             Abrir painel de testes
-          </button>
+          </AppButton>
           
-          <button 
+          <AppButton 
             @click="irParaPainelMedico"
-            class="w-full sm:w-auto bg-white border-2 border-slate-200 text-slate-700 px-12 py-5 rounded-2xl text-xl font-bold hover:bg-slate-50 transition-all active:scale-95 focus:outline-none focus:ring-4 focus:ring-slate-200"
+            variant="secondary"
+            size="lg"
+            class="w-full sm:w-auto"
           >
             Painel Analítico
-          </button>
+          </AppButton>
         </div>
       </div>
     </main>
@@ -99,35 +92,35 @@ const irParaPainelMedico = () => {
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14">
         
-        <div class="flex flex-col items-center text-center group p-6 rounded-3xl hover:bg-slate-50 transition-colors">
-          <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+        <AppCard padding="p-8" hoverable class="text-center">
+          <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-4xl mb-6 mx-auto group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
             ⏱️
           </div>
           <h3 class="text-2xl font-bold mb-3 text-slate-800">Métricas de Precisão</h3>
           <p class="text-slate-600 leading-relaxed text-lg">
             Avaliamos o tempo de reação em milissegundos e os padrões de hesitação do paciente durante o teste.
           </p>
-        </div>
+        </AppCard>
 
-        <div class="flex flex-col items-center text-center group p-6 rounded-3xl hover:bg-slate-50 transition-colors">
-          <div class="w-20 h-20 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-sm">
+        <AppCard padding="p-8" hoverable class="text-center">
+          <div class="w-20 h-20 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-4xl mb-6 mx-auto group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-sm">
             🧠
           </div>
           <h3 class="text-2xl font-bold mb-3 text-slate-800">Inteligência Artificial</h3>
           <p class="text-slate-600 leading-relaxed text-lg">
             Modelos de Machine Learning classificam o nível de risco cognitivo processando o histórico do usuário.
           </p>
-        </div>
+        </AppCard>
 
-        <div class="flex flex-col items-center text-center group p-6 rounded-3xl hover:bg-slate-50 transition-colors">
-          <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
+        <AppCard padding="p-8" hoverable class="text-center">
+          <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-4xl mb-6 mx-auto group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
             👵
           </div>
           <h3 class="text-2xl font-bold mb-3 text-slate-800">Design Acessível</h3>
           <p class="text-slate-600 leading-relaxed text-lg">
             Interfaces de alto contraste, elementos amplos e ausência de ruído visual para não confundir o idoso.
           </p>
-        </div>
+        </AppCard>
 
       </div>
     </section>

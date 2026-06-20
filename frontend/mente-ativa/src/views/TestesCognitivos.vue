@@ -1,6 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import DiagnosticShell from '../components/diagnostics/DiagnosticShell.vue'
+import TestCard from '../components/diagnostics/TestCard.vue'
 import { diagnosticRoutes, semanticCategories } from '../data/diagnosticTests'
 
 const router = useRouter()
@@ -31,6 +32,10 @@ const cards = [
     metrics: ['Tempo total', 'Erros de sequência', 'Click log'],
   },
 ]
+
+const handleStartTest = (route) => {
+  router.push(route)
+}
 </script>
 
 <template>
@@ -43,31 +48,17 @@ const cards = [
     @dashboard="router.push('/profile')"
   >
     <section class="grid gap-6 lg:grid-cols-3">
-      <article
+      <TestCard
         v-for="card in cards"
         :key="card.title"
-        class="rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm flex flex-col gap-4"
-      >
-        <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-slate-700 w-fit">
-          {{ card.label }}
-        </div>
-
-        <div class="space-y-2">
-          <h2 class="text-2xl font-black text-slate-950">{{ card.title }}</h2>
-          <p class="text-slate-600 leading-relaxed">{{ card.description }}</p>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <span v-for="metric in card.metrics" :key="metric" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{{ metric }}</span>
-        </div>
-
-        <button
-          @click="router.push(card.route)"
-          class="mt-auto rounded-2xl bg-slate-950 px-5 py-3 font-black text-white hover:bg-slate-800"
-        >
-          Iniciar teste
-        </button>
-      </article>
+        :title="card.title"
+        :label="card.label"
+        :description="card.description"
+        :metrics="card.metrics"
+        :route="card.route"
+        :accent="card.accent"
+        @start="handleStartTest(card.route)"
+      />
     </section>
   </DiagnosticShell>
 </template>

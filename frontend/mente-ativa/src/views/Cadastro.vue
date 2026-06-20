@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
+import AppButton from '../components/base/AppButton.vue'
+import AppInput from '../components/base/AppInput.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -187,51 +189,67 @@ const realizarCadastro = async () => {
             </span>
           </div>
           
-          <div>
-            <label class="block text-sm font-semibold text-slate-700">Nome Completo</label>
-            <input v-model="nome" type="text" required placeholder="Dr(a). Nome Sobrenome" 
-              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
-          </div>
+          <AppInput
+            v-model="nome"
+            type="text"
+            label="Nome Completo"
+            placeholder="Dr(a). Nome Sobrenome"
+            required
+          />
 
-          <div>
-            <label class="block text-sm font-semibold text-slate-700">E-mail</label>
-            <input v-model="email" type="email" required placeholder="contato@clinica.com" 
-              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
-          </div>
+          <AppInput
+            v-model="email"
+            type="email"
+            label="E-mail"
+            placeholder="contato@clinica.com"
+            required
+          />
 
           <!-- Campo CRM/CRP apenas para especialista -->
           <div v-if="cargo === 'especialista'">
-            <label class="block text-sm font-semibold text-slate-700">CRM / CRP</label>
-            <input v-model="crmcrp" type="text" required placeholder="Número do registro profissional" 
-              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
+            <AppInput
+              v-model="crmcrp"
+              type="text"
+              label="CRM / CRP"
+              placeholder="Número do registro profissional"
+              required
+            />
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-semibold text-slate-700">Senha</label>
-              <input v-model="senha" type="password" required placeholder="••••••••" 
-                class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
-            </div>
+            <AppInput
+              v-model="senha"
+              type="password"
+              label="Senha"
+              placeholder="••••••••"
+              required
+            />
 
-            <div>
-              <label class="block text-sm font-semibold text-slate-700">Confirmar Senha</label>
-              <input v-model="confirmSenha" type="password" required placeholder="••••••••" 
-                class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
-            </div>
+            <AppInput
+              v-model="confirmSenha"
+              type="password"
+              label="Confirmar Senha"
+              placeholder="••••••••"
+              required
+            />
           </div>
 
           <div class="pt-2">
-            <button 
+            <AppButton 
               type="submit" 
-              :disabled="carregando"
-              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-lg font-bold transition-all shadow-lg shadow-emerald-200 active:scale-95 disabled:opacity-50"
+              :loading="carregando"
+              variant="primary"
+              size="lg"
+              class="w-full"
             >
               <span v-if="!carregando">Criar Minha Conta</span>
-              <span v-else class="flex justify-center items-center gap-2">
-                <svg class="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Processando...
-              </span>
-            </button>
+              <template #loading>
+                <span class="flex justify-center items-center gap-2">
+                  <svg class="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Processando...
+                </span>
+              </template>
+            </AppButton>
           </div>
         </form>
 
