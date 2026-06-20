@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
@@ -8,15 +8,35 @@ import { auth, db } from '../config/firebase'
 const router = useRouter()
 const route = useRoute()
 
+// Etapas: 'selecao' -> 'formulario'
+const etapa = ref(route.query.role ? 'formulario' : 'selecao')
+
 // Estados do formulário
 const nome = ref('')
 const email = ref('')
 const senha = ref('')
 const confirmSenha = ref('')
-const cargo = ref(route.query.role || 'paciente') // Valor padrão pode vir da query
+const cargo = ref(route.query.role || '')
 const crmcrp = ref('')
 const carregando = ref(false)
 const erroCadastro = ref('')
+
+const tituloFormulario = computed(() => {
+  if (cargo.value === 'especialista') return 'Cadastro do Profissional'
+  if (cargo.value === 'paciente') return 'Cadastro do Paciente'
+  return 'Crie sua conta'
+})
+
+const selecionarPerfil = (perfil) => {
+  cargo.value = perfil
+  etapa.value = 'formulario'
+}
+
+const voltarSelecao = () => {
+  etapa.value = 'selecao'
+  cargo.value = ''
+  erroCadastro.value = ''
+}
 
 const realizarCadastro = async () => {
   erroCadastro.value = ''
@@ -68,11 +88,67 @@ const realizarCadastro = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+  <!-- ETAPA DE SELEÇÃO DE PERFIL -->
+  <div v-if="etapa === 'selecao'" class="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
     
     <div class="absolute top-8 left-8">
       <button @click="router.push('/')" class="text-slate-500 hover:text-emerald-600 flex items-center gap-2 transition-colors font-medium">
         <span>←</span> Voltar para a Home
+      </button>
+    </div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-lg text-center mb-8">
+      <div class="inline-flex items-center gap-2 mb-4 select-none">
+        <div class="bg-emerald-600 p-2 rounded-lg shadow-md">
+          <span class="text-white text-xl font-bold">M</span>
+        </div>
+        <span class="text-2xl font-bold text-slate-800 tracking-tight">Mente Ativa</span>
+      </div>
+      <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Crie sua conta</h2>
+      <p class="mt-2 text-sm text-slate-600">Selecione o tipo de perfil para começar.</p>
+    </div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-lg">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        
+        <!-- Card Paciente -->
+        <button
+          @click="selecionarPerfil('paciente')"
+          class="group bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border-2 border-slate-100 hover:border-emerald-400 hover:shadow-emerald-100/50 transition-all text-center"
+        >
+          <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+            <span class="text-4xl">👤</span>
+          </div>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Paciente</h3>
+          <p class="text-sm text-slate-500 leading-relaxed">
+            Acesse testes cognitivos, acompanhe seu histórico e monitore sua saúde mental.
+          </p>
+        </button>
+
+        <!-- Card Médico/Especialista -->
+        <button
+          @click="selecionarPerfil('especialista')"
+          class="group bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 border-2 border-slate-100 hover:border-emerald-400 hover:shadow-emerald-100/50 transition-all text-center"
+        >
+          <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-sky-100 flex items-center justify-center group-hover:bg-sky-200 transition-colors">
+            <span class="text-4xl">👨‍⚕️</span>
+          </div>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Médico / Especialista</h3>
+          <p class="text-sm text-slate-500 leading-relaxed">
+            Aplique testes, gerencie pacientes e acompanhe resultados detalhados.
+          </p>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ETAPA DE FORMULÁRIO PERSONALIZADO -->
+  <div v-else class="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    
+    <div class="absolute top-8 left-8">
+      <button @click="voltarSelecao" class="text-slate-500 hover:text-emerald-600 flex items-center gap-2 transition-colors font-medium">
+        <span>←</span> Voltar
       </button>
     </div>
 
@@ -83,61 +159,68 @@ const realizarCadastro = async () => {
         </div>
         <span class="text-2xl font-bold text-slate-800 tracking-tight">Mente Ativa</span>
       </div>
-      <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Crie sua conta</h2>
-      <p class="mt-2 text-sm text-slate-600">Comece a monitorar a saúde cognitiva hoje mesmo.</p>
+      <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ tituloFormulario }}</h2>
+      <p class="mt-2 text-sm text-slate-600">Preencha os dados abaixo para criar sua conta.</p>
     </div>
 
     <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
       <div class="bg-white py-10 px-6 shadow-xl shadow-slate-200/50 sm:rounded-3xl sm:px-12 border border-slate-100">
         
-        <form class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4" @submit.prevent="realizarCadastro">
-          <div v-if="erroCadastro" class="sm:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <form class="space-y-6" @submit.prevent="realizarCadastro">
+          <div v-if="erroCadastro" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
             {{ erroCadastro }}
           </div>
+
+          <!-- Badge do perfil selecionado -->
+          <div class="flex justify-center mb-2">
+            <span
+              v-if="cargo === 'paciente'"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold"
+            >
+              <span>👤</span> Perfil: Paciente
+            </span>
+            <span
+              v-else-if="cargo === 'especialista'"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-100 text-sky-700 text-sm font-semibold"
+            >
+              <span>👨‍⚕️</span> Perfil: Médico / Especialista
+            </span>
+          </div>
           
-          <div class="sm:col-span-2">
+          <div>
             <label class="block text-sm font-semibold text-slate-700">Nome Completo</label>
             <input v-model="nome" type="text" required placeholder="Dr(a). Nome Sobrenome" 
               class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
           </div>
 
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-semibold text-slate-700">E-mail Profissional</label>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700">E-mail</label>
             <input v-model="email" type="email" required placeholder="contato@clinica.com" 
               class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
           </div>
 
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-semibold text-slate-700">Função</label>
-            <select v-model="cargo" class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 bg-white text-slate-900">
-              <option value="especialista">Especialista (Médico/Psicólogo)</option>
-              <option value="responsavel">Responsável Familiar</option>
-              <option value="administrador">Administrador</option>
-              <option value="pesquisador">Pesquisador</option>
-              <option value="paciente">Paciente</option>
-              <option value="outro">Outro</option>
-            </select>
-          </div>
-
-          <div class="sm:col-span-2" v-if="cargo === 'especialista'">
-            <label class="block text-sm font-semibold text-slate-700">CRM/CRP</label>
-            <input v-model="crmcrp" type="text" required placeholder="CRM/CRP" 
+          <!-- Campo CRM/CRP apenas para especialista -->
+          <div v-if="cargo === 'especialista'">
+            <label class="block text-sm font-semibold text-slate-700">CRM / CRP</label>
+            <input v-model="crmcrp" type="text" required placeholder="Número do registro profissional" 
               class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
           </div>
 
-          <div>
-            <label class="block text-sm font-semibold text-slate-700">Senha</label>
-            <input v-model="senha" type="password" required placeholder="••••••••" 
-              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700">Senha</label>
+              <input v-model="senha" type="password" required placeholder="••••••••" 
+                class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700">Confirmar Senha</label>
+              <input v-model="confirmSenha" type="password" required placeholder="••••••••" 
+                class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
+            </div>
           </div>
 
-          <div>
-            <label class="block text-sm font-semibold text-slate-700">Confirmar Senha</label>
-            <input v-model="confirmSenha" type="password" required placeholder="••••••••" 
-              class="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 transition-all" />
-          </div>
-
-          <div class="sm:col-span-2 mt-4">
+          <div class="pt-2">
             <button 
               type="submit" 
               :disabled="carregando"

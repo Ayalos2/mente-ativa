@@ -207,31 +207,25 @@ const lidarComSucessoGoogle = async (resultado) => {
           <GoogleLoginButton @success="lidarComSucessoGoogle" @error="mostrarErroLoginGoogle" />
         </div>
 
-        <div class="mt-6">
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-slate-200"></div>
+          <div class="mt-6">
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-200"></div>
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-white text-slate-500 font-medium">Não tem uma conta?</span>
+              </div>
             </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-white text-slate-500 font-medium">Não tem uma conta?</span>
-            </div>
-          </div>
 
-          <div class="mt-6 grid grid-cols-2 gap-3">
-            <button
-              @click="router.push({ path: '/cadastro', query: { role: 'especialista' } })"
-              class="w-full flex justify-center py-3 px-4 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all"
-            >
-              Sou médico (cadastrar)
-            </button>
-            <button
-              @click="router.push('/cadastro')"
-              class="w-full flex justify-center py-3 px-4 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all"
-            >
-              Criar conta
-            </button>
+            <div class="mt-6">
+              <button
+                @click="router.push('/cadastro')"
+                class="w-full flex justify-center py-3.5 px-4 border-2 border-emerald-200 rounded-2xl text-base font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 transition-all active:scale-95"
+              >
+                Criar Conta
+              </button>
+            </div>
           </div>
-        </div>
       </div>
     </div>
   </div>

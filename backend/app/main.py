@@ -59,6 +59,9 @@ class LinkPatientSchema(BaseModel):
 class RequestDoctorLinkSchema(BaseModel):
     doctorUid: str
 
+class DiagnosisSchema(BaseModel):
+    diagnosis: str
+
 @app.post("/login")
 def login(dados: LoginSchema, db: Session = Depends(get_db)):
     # Busca o usuário no banco
@@ -468,9 +471,162 @@ def solicitar_vinculo_medico(payload: RequestDoctorLinkSchema, request: Request)
     }
 
 
+@app.post("/doctor-links/patients/{patient_uid}/diagnosis")
+def salvar_diagnostico_medico(patient_uid: str, payload: DiagnosisSchema, request: Request):
+    """Médico salva o diagnóstico textual do paciente."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Verifica vínculo
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
+    diagnostico = payload.diagnosis
+
+    if not diagnostico or not diagnostico.strip():
+        raise HTTPException(status_code=400, detail="O diagnostico nao pode estar vazio")
+
+    now_ms = int(__import__("time").time() * 1000)
+    now_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+    documento_diagnostico = {
+        "patientUid": patient_uid,
+        "diagnosis": diagnostico.strip(),
+        "doctorUid": doctor_uid,
+        "doctorEmail": doctor_info.get("email"),
+        "doctorName": doctor_info.get("name") or doctor_info.get("email"),
+        "updatedAtMs": now_ms,
+        "updatedAtIso": now_iso,
+        "availableToPatient": False,
+    }
+
+    client.collection("diagnosticos_medicos").document(patient_uid).set(documento_diagnostico, merge=True)
+
+    return {
+        "status": "sucesso",
+        "patientUid": patient_uid,
+        "diagnosis": diagnostico.strip(),
+        "updatedAtIso": now_iso,
+    }
+
+
+@app.get("/doctor-links/patients/{patient_uid}/diagnosis")
+def visualizar_diagnostico_medico(patient_uid: str, request: Request):
+    """Médico visualiza o diagnóstico salvo de um paciente."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Verifica vínculo
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
+    diagnostico = _fetch_firestore_doc_by_uid("diagnosticos_medicos", patient_uid)
+
+    if not diagnostico:
+        return {
+            "status": "sucesso",
+            "hasDiagnosis": False,
+            "patientUid": patient_uid,
+        }
+
+    return {
+        "status": "sucesso",
+        "hasDiagnosis": True,
+        "patientUid": patient_uid,
+        "diagnosis": diagnostico.get("diagnosis"),
+        "doctorUid": diagnostico.get("doctorUid"),
+        "doctorName": diagnostico.get("doctorName"),
+        "updatedAtIso": diagnostico.get("updatedAtIso"),
+        "availableToPatient": diagnostico.get("availableToPatient", False),
+    }
+
+
+@app.post("/doctor-links/patients/{patient_uid}/publish-summary")
+def publicar_resumo_para_paciente(patient_uid: str, request: Request):
+    """Médico disponibiliza o resumo LLM e diagnóstico para o paciente visualizar."""
+    token = _get_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
+
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
+
+    try:
+        client = get_firestore_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Verifica vínculo
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
+    # Verifica se tem resumo salvo
+    resumo = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
+    if not resumo:
+        raise HTTPException(status_code=400, detail="Nenhum resumo LLM foi gerado para este paciente ainda. Gere o resumo primeiro.")
+
+    now_ms = int(__import__("time").time() * 1000)
+    now_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+    # Marca resumo como disponível para o paciente
+    client.collection("resumos_saude_paciente").document(patient_uid).update({
+        "availableToPatient": True,
+        "publishedAtMs": now_ms,
+        "publishedAtIso": now_iso,
+        "publishedByDoctorUid": doctor_uid,
+    })
+
+    # Também marca diagnóstico como disponível se existir
+    diagnostico = _fetch_firestore_doc_by_uid("diagnosticos_medicos", patient_uid)
+    if diagnostico:
+        client.collection("diagnosticos_medicos").document(patient_uid).update({
+            "availableToPatient": True,
+            "publishedAtMs": now_ms,
+            "publishedAtIso": now_iso,
+        })
+
+    return {
+        "status": "sucesso",
+        "patientUid": patient_uid,
+        "publishedAtIso": now_iso,
+        "summaryAvailable": True,
+        "diagnosisAvailable": bool(diagnostico),
+    }
+
+
 @app.get("/doctor-links/my-health-summary")
 def meu_resumo_saude(request: Request):
-    """Paciente visualiza seu proprio resumo de saúde salvo."""
+    """Paciente visualiza seu proprio resumo de saúde salvo e diagnóstico."""
     token = _get_bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
@@ -490,6 +646,9 @@ def meu_resumo_saude(request: Request):
     # Busca resumo salvo
     resumo_salvo = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
 
+    # Busca diagnóstico médico
+    diagnostico = _fetch_firestore_doc_by_uid("diagnosticos_medicos", patient_uid)
+
     if not resumo_salvo:
         return {
             "status": "sucesso",
@@ -498,51 +657,74 @@ def meu_resumo_saude(request: Request):
             "patientName": patient_profile.get("nome") or patient_info.get("email"),
         }
 
+    # Verifica se o médico disponibilizou para o paciente
+    available_to_patient = resumo_salvo.get("availableToPatient", False)
+
+    if not available_to_patient:
+        return {
+            "status": "sucesso",
+            "hasSummary": False,
+            "availableToPatient": False,
+            "patientUid": patient_uid,
+            "patientName": patient_profile.get("nome") or patient_info.get("email"),
+        }
+
     return {
         "status": "sucesso",
         "hasSummary": True,
+        "availableToPatient": True,
         "patientUid": patient_uid,
         "patientName": patient_profile.get("nome") or patient_info.get("email"),
         "summary": resumo_salvo.get("summary"),
         "source": resumo_salvo.get("source"),
         "generatedAtIso": resumo_salvo.get("generatedAtIso"),
         "testsAnalyzed": resumo_salvo.get("testsAnalyzed"),
+        "diagnosis": diagnostico.get("diagnosis") if diagnostico and diagnostico.get("availableToPatient") else None,
+        "diagnosisDoctorName": diagnostico.get("doctorName") if diagnostico and diagnostico.get("availableToPatient") else None,
     }
 
 
-@app.post("/doctor-links/my-health-summary/generate")
-def gerar_meu_resumo_saude(request: Request):
-    """Paciente gera e salva seu resumo de saúde baseado nos testes."""
+@app.post("/doctor-links/patients/{patient_uid}/generate-summary")
+def gerar_resumo_llm_paciente(patient_uid: str, request: Request):
+    """Médico gera o resumo LLM do paciente e o disponibiliza."""
     token = _get_bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
 
-    patient_info = verify_firebase_token(token)
-    patient_uid = patient_info.get("uid")
-    if not patient_uid:
-        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o paciente")
+    doctor_info = verify_firebase_token(token)
+    doctor_uid = doctor_info.get("uid")
+    if not doctor_uid:
+        raise HTTPException(status_code=401, detail="Nao foi possivel identificar o medico")
 
     try:
         client = get_firestore_client()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # Verifica vínculo
+    vinculo_id = f"{doctor_uid}__{patient_uid}"
+    vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
+    if not vinculo.exists:
+        raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
+
     patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
     historico = listar_historico_teste(user_key=patient_uid, limit_count=20)
 
     if not historico:
-        raise HTTPException(status_code=400, detail="Você precisa ter pelo menos um teste realizado para gerar o resumo.")
+        raise HTTPException(status_code=400, detail="O paciente precisa ter pelo menos um teste realizado para gerar o resumo.")
 
     resumo = gerar_resumo_clinico_paciente(
         patient_profile=patient_profile,
         historico_testes=historico,
     )
 
-    # Salva no Firestore
+    # Salva no Firestore como resumo gerado pelo médico
     documento_resumo = {
         "patientUid": patient_uid,
-        "patientName": patient_profile.get("nome") or patient_info.get("email"),
-        "patientEmail": patient_info.get("email"),
+        "patientName": patient_profile.get("nome") or patient_uid,
+        "patientEmail": patient_profile.get("email"),
+        "generatedByDoctorUid": doctor_uid,
+        "generatedByDoctorEmail": doctor_info.get("email"),
         **resumo,
         "updatedAtMs": int(__import__("time").time() * 1000),
     }
@@ -552,6 +734,7 @@ def gerar_meu_resumo_saude(request: Request):
     return {
         "status": "sucesso",
         "patientUid": patient_uid,
+        "generatedByDoctorUid": doctor_uid,
         **resumo,
     }
 

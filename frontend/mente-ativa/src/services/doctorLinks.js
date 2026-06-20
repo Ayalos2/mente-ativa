@@ -106,10 +106,61 @@ export const carregarMeuResumoSaude = async () => {
   })
 }
 
-export const gerarMeuResumoSaude = async () => {
+// ========== NOVAS FUNÇÕES ==========
+
+/**
+ * Médico gera o resumo LLM do paciente
+ */
+export const gerarResumoPaciente = async (patientUid) => {
   const headers = await getAuthHeaders()
 
-  return axios.post(`${apiBaseUrl}/doctor-links/my-health-summary/generate`, {}, {
+  return axios.post(`${apiBaseUrl}/doctor-links/patients/${patientUid}/generate-summary`, {}, {
+    headers,
+  })
+}
+
+/**
+ * Médico salva o diagnóstico textual do paciente
+ */
+export const salvarDiagnosticoPaciente = async (patientUid, diagnosis) => {
+  const headers = await getAuthHeaders()
+
+  return axios.post(
+    `${apiBaseUrl}/doctor-links/patients/${patientUid}/diagnosis`,
+    { diagnosis },
+    { headers }
+  )
+}
+
+/**
+ * Médico visualiza o diagnóstico salvo de um paciente
+ */
+export const carregarDiagnosticoPaciente = async (patientUid) => {
+  const headers = await getAuthHeaders()
+
+  return axios.get(`${apiBaseUrl}/doctor-links/patients/${patientUid}/diagnosis`, {
+    headers,
+  })
+}
+
+/**
+ * Médico disponibiliza o resumo LLM e diagnóstico para o paciente visualizar
+ */
+export const publicarResumoParaPaciente = async (patientUid) => {
+  const headers = await getAuthHeaders()
+
+  return axios.post(`${apiBaseUrl}/doctor-links/patients/${patientUid}/publish-summary`, {}, {
+    headers,
+  })
+}
+
+/**
+ * Paciente visualiza seu diagnóstico médico (se disponibilizado)
+ */
+export const carregarMeuDiagnostico = async () => {
+  const headers = await getAuthHeaders()
+
+  return axios.get(`${apiBaseUrl}/doctor-links/my-health-summary`, {
     headers,
   })
 }
