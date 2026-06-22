@@ -18,3 +18,7 @@ backend/service-account.json
 # Local env files
 .env.local
 .env.*.local
+
+# Node artifacts at root level (cors dependency)
+/node_modules/
+.vite/
