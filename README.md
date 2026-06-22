@@ -2,7 +2,7 @@
 
 Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos e médicos especialistas acompanham a evolução por meio de resumos clínicos gerados por IA.
 
-> **Monorepo** contendo backend (FastAPI + SQLite + Firebase) e frontend (Vue 3 + Vite + Tailwind CSS).
+> **Monorepo** contendo backend (FastAPI + Firebase) e frontend (Vue 3 + Vite + Tailwind CSS).
 
 ---
 
@@ -32,12 +32,11 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 | **Python** | 3.11 | Linguagem principal |
 | **FastAPI** | — | Framework web assíncrono |
 | **Uvicorn** | — | Servidor ASGI |
-| **SQLAlchemy** | — | ORM para banco relacional |
-| **SQLite** | — | Banco de dados (desenvolvimento) |
+| **Firebase Admin SDK** | — | Autenticação e Firestore |
+| **SQLAlchemy** | — | ORM para banco local (apenas login legado) |
 | **Pydantic** | — | Validação de schemas |
 | **python-dotenv** | — | Gerenciamento de variáveis de ambiente |
-| **Firebase Admin SDK** | — | Autenticação e Firestore |
-| **Requests** | — | Chamadas HTTP (Gemini API) |
+| **Requests** | — | Chamadas HTTP (Gemini API e Firebase Auth REST) |
 | **Docker** | — | Containerização |
 
 ### Frontend
@@ -56,7 +55,7 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 ### Serviços Externos
 
 - **Firebase Authentication** — Login com Google e e-mail/senha
-- **Firebase Firestore** — Armazenamento de resultados de testes, perfis e vínculos médico-paciente
+- **Firebase Firestore** — Banco de dados principal: perfis, testes, vínculos e resumos
 - **Google Gemini API** — Geração opcional de resumos clínicos por LLM (fallback local quando não configurada)
 
 ### Infraestrutura
@@ -83,7 +82,7 @@ mente-ativa/
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py              # Rotas e configuração FastAPI
-│   │   ├── database.py          # Conexão SQLAlchemy + SQLite
+│   │   ├── database.py          # Conexão SQLAlchemy (uso legado)
 │   │   └── services/
 │   │       ├── firebase_auth.py     # Verificação de token Firebase
 │   │       ├── firebase_firestore.py # Cliente Firestore
@@ -154,6 +153,8 @@ FIREBASE_PROJECT_ID=seu-project-id
 FIREBASE_API_KEY=sua-web-api-key
 FRONTEND_ORIGIN=http://localhost:5173
 ```
+
+> **Nota:** O `DATABASE_URL` com SQLite é usado apenas para login legado por email/senha. Todos os dados principais (testes, perfis, vínculos) são armazenados no **Firebase Firestore**.
 
 ### 3. Crie e ative o virtualenv
 
@@ -258,7 +259,7 @@ Certifique-se de que o arquivo `backend/.env` esteja configurado antes de execut
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `DATABASE_URL` | ✅ | URL de conexão do banco (SQLite ou PostgreSQL) |
+| `DATABASE_URL` | ❌ | URL de conexão SQLite (apenas login legado por email/senha) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | ✅* | Caminho para o JSON da service account |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | ✅* | Conteúdo da service account em JSON (alternativa ao path) |
 | `FIREBASE_PROJECT_ID` | ✅ | ID do projeto Firebase |
@@ -288,9 +289,9 @@ O projeto utiliza Firebase Authentication com dois provedores:
 - **Google Sign-In** — Login com conta Google
 - **E-mail/Senha** — Cadastro e login tradicionais
 
-### Firestore
+### Firestore (Banco de Dados Principal)
 
-Coleções utilizadas:
+O Firestore é o banco de dados principal da aplicação. Coleções utilizadas:
 
 | Coleção | Descrição |
 |---|---|
@@ -298,6 +299,7 @@ Coleções utilizadas:
 | `historico_testes` | Resultados de testes cognitivos |
 | `vinculos_medico_paciente` | Vínculos entre médicos e pacientes |
 | `resumos_saude_paciente` | Resumos clínicos gerados por IA |
+| `diagnosticos_medicos` | Diagnósticos textuais salvos por médicos |
 
 ### Regras de Segurança
 
@@ -315,24 +317,24 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/` | Status da API |
-| `GET` | `/test_db` | Testa conexão com o banco de dados |
+| `GET` | `/test_db` | Testa conexão com o banco local (SQLite legado) |
 | `GET` | `/firebase/status` | Status da conexão Firebase |
 
 ### Autenticação
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/login` | Login com e-mail e senha (banco local) |
+| `POST` | `/login` | Login com e-mail e senha (SQLite legado) |
 | `POST` | `/auth/google` | Login com Google (token Firebase) |
 
-### Testes Cognitivos
+### Testes Cognitivos (Firestore)
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/tests/results` | Salva resultado de um teste |
-| `GET` | `/tests/results?userKey=...` | Lista histórico de testes do usuário |
+| `POST` | `/tests/results` | Salva resultado de um teste no Firestore |
+| `GET` | `/tests/results?userKey=...` | Lista histórico de testes do usuário do Firestore |
 
-### Vínculo Médico-Paciente
+### Vínculo Médico-Paciente (Firestore)
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -344,12 +346,16 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 | `POST` | `/doctor-links/request` | Paciente solicita vínculo com médico |
 | `GET` | `/doctor-links/my-health-summary` | Paciente vê seu resumo de saúde |
 | `POST` | `/doctor-links/my-health-summary/generate` | Paciente gera seu resumo de saúde |
+| `POST` | `/doctor-links/patients/{uid}/generate-summary` | Médico gera resumo LLM do paciente |
+| `POST` | `/doctor-links/patients/{uid}/diagnosis` | Médico salva diagnóstico textual |
+| `GET` | `/doctor-links/patients/{uid}/diagnosis` | Médico visualiza diagnóstico salvo |
+| `POST` | `/doctor-links/patients/{uid}/publish-summary` | Médico disponibiliza resumo para paciente |
 
-### Vínculos (Banco Relacional)
+### Vínculos (SQLite Legado)
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/links` | Cria vínculo médico-paciente no banco local |
+| `POST` | `/links` | Cria vínculo médico-paciente no SQLite |
 | `DELETE` | `/links` | Remove vínculo |
 | `GET` | `/links/doctor/{key}` | Lista pacientes de um médico |
 | `GET` | `/links/patient/{key}` | Lista médicos de um paciente |
