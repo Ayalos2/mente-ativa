@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,6 +9,10 @@ from .services.firebase_auth import verify_firebase_token
 from .services.firebase_firestore import get_firestore_client
 from .services.llm_summary import gerar_resumo_clinico_paciente
 from .services.test_results import listar_historico_teste, salvar_resultado_teste
+
+# Carrega as variaveis do arquivo .env na raiz do backend, independente do cwd.
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
 
 app = FastAPI(title="Mente Ativa API")
 

@@ -2,12 +2,17 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
+from dotenv import load_dotenv
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+# Carrega variaveis do .env para garantir que estejam disponiveis
+ENV_FILE = BACKEND_ROOT / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
 
 
 @lru_cache(maxsize=1)
