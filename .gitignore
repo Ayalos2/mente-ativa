@@ -10,6 +10,11 @@ backend/service-account.json
 # Python virtualenvs
 .venv/
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # Local env files
 .env.local
 .env.*.local
