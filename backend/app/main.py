@@ -1,12 +1,8 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException, Body, Request
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 from firebase_admin import firestore
-from .database import engine, Base, get_db
 from .services.firebase_auth import verify_firebase_token
 from .services.firebase_firestore import get_firestore_client
 from .services.llm_summary import gerar_resumo_clinico_paciente
@@ -25,16 +21,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Passa a lista aqui
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Modelo de dados para receber o login
-class LoginSchema(BaseModel):
-    email: str
-    senha: str
 
 
 class GoogleLoginSchema(BaseModel):
@@ -56,66 +47,14 @@ class TestResultSchema(BaseModel):
 class LinkPatientSchema(BaseModel):
     patientEmail: str
 
+
 class RequestDoctorLinkSchema(BaseModel):
     doctorUid: str
+
 
 class DiagnosisSchema(BaseModel):
     diagnosis: str
 
-@app.post("/login")
-def login(dados: LoginSchema, db: Session = Depends(get_db)):
-    # Busca o usuário no banco
-    usuario = db.execute(
-        text("SELECT * FROM usuarios WHERE email = :email AND senha = :senha"),
-        {"email": dados.email, "senha": dados.senha},
-    ).fetchone()
-    
-    if usuario:
-        return {"status": "sucesso", "usuario": usuario.nome}
-    else:
-        return {"status": "erro", "mensagem": "E-mail ou senha incorretos"}
-
-
-@app.post("/auth/google")
-def login_google(dados: GoogleLoginSchema, db: Session = Depends(get_db)):
-    token_info = verify_firebase_token(dados.credential)
-
-    email = token_info.get("email")
-    nome = token_info.get("name") or (dados.user.get("nome") if dados.user else email)
-
-    if not email:
-        raise HTTPException(status_code=400, detail="Token Google sem e-mail")
-
-    # Tenta buscar usuário no banco, mas não falha se banco não estiver disponível
-    nome_usuario = nome
-    try:
-        usuario = db.execute(
-            text("SELECT nome FROM usuarios WHERE email = :email"),
-            {"email": email},
-        ).fetchone()
-        
-        if usuario:
-            nome_usuario = usuario.nome
-    except Exception as exc:
-        # Se banco falhar, usa o nome do token Firebase
-        print(f"Aviso: Não foi possível acessar banco de dados. Usando dados do Firebase: {exc}")
-        nome_usuario = nome
-
-    return {
-        "status": "sucesso",
-        "usuario": nome_usuario,
-        "email": email,
-        "provedor": "google",
-    }
-
-
-@app.on_event("startup")
-def init_database():
-    # Mantem a API de pe mesmo se o banco estiver indisponivel no boot.
-    try:
-        Base.metadata.create_all(bind=engine)
-    except SQLAlchemyError as exc:
-        print(f"Aviso ao inicializar banco: {exc}")
 
 @app.get("/")
 def home():
@@ -123,15 +62,6 @@ def home():
         "mensagem": "API Mente Ativa conectada ao Firebase!",
         "status": "Online"
     }
-
-# Rota de teste para verificar se a conexão com o banco está ok
-@app.get("/test_db")
-def test_db(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("SELECT 1"))
-        return {"status": "Conexão com banco de dados bem-sucedida!"}
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=503, detail=f"Falha na conexão com banco: {str(e)}")
 
 
 @app.get('/firebase/status')
@@ -150,92 +80,16 @@ def salvar_resultado_teste_api(dados: TestResultSchema):
     return {"status": "sucesso", "id": documento_id}
 
 
-@app.post('/links')
-def create_link(payload: dict = Body(...)):
-    doctor = payload.get('doctorKey')
-    patient = payload.get('patientKey')
-
-    if not doctor or not patient:
-        raise HTTPException(status_code=400, detail='doctorKey and patientKey are required')
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(
-                text('INSERT INTO vinculos_medicos (doctor_key, patient_key) VALUES (:doctor, :patient) ON CONFLICT DO NOTHING'),
-                {'doctor': doctor, 'patient': patient}
-            )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return {'status': 'sucesso'}
-
-
-@app.delete('/links')
-def delete_link(payload: dict = Body(...)):
-    doctor = payload.get('doctorKey')
-    patient = payload.get('patientKey')
-
-    if not doctor or not patient:
-        raise HTTPException(status_code=400, detail='doctorKey and patientKey are required')
-
-    try:
-        with engine.begin() as conn:
-            conn.execute(
-                text('DELETE FROM vinculos_medicos WHERE doctor_key = :doctor AND patient_key = :patient'),
-                {'doctor': doctor, 'patient': patient}
-            )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return {'status': 'sucesso'}
-
-
-@app.get('/links/doctor/{doctor_key}')
-def list_patients_for_doctor(doctor_key: str):
-    try:
-        with engine.connect() as conn:
-            resultados = conn.execute(
-                text('SELECT patient_key, created_at FROM vinculos_medicos WHERE doctor_key = :doctor ORDER BY created_at DESC'),
-                {'doctor': doctor_key}
-            ).fetchall()
-
-            return {'status': 'sucesso', 'patients': [dict(r) for r in resultados]}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.get('/links/patient/{patient_key}')
-def list_doctors_for_patient(patient_key: str):
-    try:
-        with engine.connect() as conn:
-            resultados = conn.execute(
-                text('SELECT doctor_key, created_at FROM vinculos_medicos WHERE patient_key = :patient ORDER BY created_at DESC'),
-                {'patient': patient_key}
-            ).fetchall()
-
-            return {'status': 'sucesso', 'doctors': [dict(r) for r in resultados]}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
 @app.get("/tests/results")
-def listar_resultados_teste_api(userKey: str, request: Request, limit: int = 20): # 1. Adicionei o request aqui
+def listar_resultados_teste_api(userKey: str, request: Request, limit: int = 20):
     try:
-        # Se a função listar_historico_teste precisar do token, passe o request para ela:
-        # resultados = listar_historico_teste(userKey=userKey, limit_count=limit, request=request)
-        
         resultados = listar_historico_teste(user_key=userKey, limit_count=limit)
-        
         return {"status": "sucesso", "resultados": resultados}
-        
     except Exception as exc:
-        # 2. Isso vai printar o erro EXATO no seu terminal Python para você ver
         print(f"--- ERRO CRÍTICO NO BACKEND ---")
         import traceback
-        traceback.print_exc() 
+        traceback.print_exc()
         print(f"--------------------------------")
-        
-        # Retorna um erro formatado para o Vue não se perder no CORS
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -261,7 +115,6 @@ def _fetch_firestore_doc_by_uid(collection_name: str, uid: str):
 @app.post("/doctor-links/link")
 def vincular_paciente_medico(payload: LinkPatientSchema, request: Request):
     token = _get_bearer_token(request)
-    print(f"👉 TOKEN RECEBIDO NO BACKEND: {token}") # <--- Adicione isso para debugar
     if not token:
         raise HTTPException(status_code=401, detail="Token de autenticacao nao informado")
 
@@ -339,7 +192,6 @@ def listar_pacientes_do_medico(request: Request):
         historico = listar_historico_teste(user_key=patient_uid, limit_count=1)
         ultimo_teste = historico[0] if historico else None
 
-        # Busca resumo de saúde salvo pelo paciente
         resumo_saude = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
 
         pacientes.append({
@@ -391,7 +243,6 @@ def listar_medicos_do_paciente(request: Request):
         link = documento.to_dict() or {}
         doctor_uid = link.get("doctorUid")
 
-        # Busca dados do médico no Firestore
         doctor_profile = _fetch_firestore_doc_by_uid("usuarios", doctor_uid) or {}
 
         medicos.append({
@@ -436,16 +287,13 @@ def solicitar_vinculo_medico(payload: RequestDoctorLinkSchema, request: Request)
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Verifica se o médico existe
     doctor_profile = _fetch_firestore_doc_by_uid("usuarios", doctor_uid)
     if not doctor_profile:
         raise HTTPException(status_code=404, detail="Médico nao encontrado")
 
-    # Verifica se o médico é especialista
     if doctor_profile.get("cargo") != "especialista":
         raise HTTPException(status_code=400, detail="O usuario informado nao é um especialista")
 
-    # Busca dados do paciente
     patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
 
     vinculo_id = f"{doctor_uid}__{patient_uid}"
@@ -488,7 +336,6 @@ def salvar_diagnostico_medico(patient_uid: str, payload: DiagnosisSchema, reques
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Verifica vínculo
     vinculo_id = f"{doctor_uid}__{patient_uid}"
     vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
     if not vinculo.exists:
@@ -540,7 +387,6 @@ def visualizar_diagnostico_medico(patient_uid: str, request: Request):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Verifica vínculo
     vinculo_id = f"{doctor_uid}__{patient_uid}"
     vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
     if not vinculo.exists:
@@ -584,13 +430,11 @@ def publicar_resumo_para_paciente(patient_uid: str, request: Request):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Verifica vínculo
     vinculo_id = f"{doctor_uid}__{patient_uid}"
     vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
     if not vinculo.exists:
         raise HTTPException(status_code=403, detail="Paciente nao vinculado a este medico")
 
-    # Verifica se tem resumo salvo
     resumo = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
     if not resumo:
         raise HTTPException(status_code=400, detail="Nenhum resumo LLM foi gerado para este paciente ainda. Gere o resumo primeiro.")
@@ -598,7 +442,6 @@ def publicar_resumo_para_paciente(patient_uid: str, request: Request):
     now_ms = int(__import__("time").time() * 1000)
     now_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
 
-    # Marca resumo como disponível para o paciente
     client.collection("resumos_saude_paciente").document(patient_uid).update({
         "availableToPatient": True,
         "publishedAtMs": now_ms,
@@ -606,7 +449,6 @@ def publicar_resumo_para_paciente(patient_uid: str, request: Request):
         "publishedByDoctorUid": doctor_uid,
     })
 
-    # Também marca diagnóstico como disponível se existir
     diagnostico = _fetch_firestore_doc_by_uid("diagnosticos_medicos", patient_uid)
     if diagnostico:
         client.collection("diagnosticos_medicos").document(patient_uid).update({
@@ -643,10 +485,7 @@ def meu_resumo_saude(request: Request):
 
     patient_profile = _fetch_firestore_doc_by_uid("usuarios", patient_uid) or {}
 
-    # Busca resumo salvo
     resumo_salvo = _fetch_firestore_doc_by_uid("resumos_saude_paciente", patient_uid)
-
-    # Busca diagnóstico médico
     diagnostico = _fetch_firestore_doc_by_uid("diagnosticos_medicos", patient_uid)
 
     if not resumo_salvo:
@@ -657,7 +496,6 @@ def meu_resumo_saude(request: Request):
             "patientName": patient_profile.get("nome") or patient_info.get("email"),
         }
 
-    # Verifica se o médico disponibilizou para o paciente
     available_to_patient = resumo_salvo.get("availableToPatient", False)
 
     if not available_to_patient:
@@ -701,7 +539,6 @@ def gerar_resumo_llm_paciente(patient_uid: str, request: Request):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Verifica vínculo
     vinculo_id = f"{doctor_uid}__{patient_uid}"
     vinculo = client.collection("vinculos_medico_paciente").document(vinculo_id).get()
     if not vinculo.exists:
@@ -718,7 +555,6 @@ def gerar_resumo_llm_paciente(patient_uid: str, request: Request):
         historico_testes=historico,
     )
 
-    # Salva no Firestore como resumo gerado pelo médico
     documento_resumo = {
         "patientUid": patient_uid,
         "patientName": patient_profile.get("nome") or patient_uid,
