@@ -29,11 +29,10 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 
 | Tecnologia | Versão | Finalidade |
 |---|---|---|
-| **Python** | 3.11 | Linguagem principal |
+| **Python** | 3.11+ | Linguagem principal |
 | **FastAPI** | — | Framework web assíncrono |
 | **Uvicorn** | — | Servidor ASGI |
 | **Firebase Admin SDK** | — | Autenticação e Firestore |
-| **SQLAlchemy** | — | ORM para banco local (apenas login legado) |
 | **Pydantic** | — | Validação de schemas |
 | **python-dotenv** | — | Gerenciamento de variáveis de ambiente |
 | **Requests** | — | Chamadas HTTP (Gemini API e Firebase Auth REST) |
@@ -49,7 +48,7 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 | **Axios** | ^1.13.6 | Cliente HTTP |
 | **Firebase JS SDK** | ^12.12.1 | Auth e Firestore no cliente |
 | **Tailwind CSS** | ^4.2.1 | Estilização utilitária |
-| **PostCSS** | — | Processamento CSS |
+| **PostCSS** | ^8.5.8 | Processamento CSS |
 | **Node.js / npm** | 18+ | Runtime e gerenciador de pacotes |
 
 ### Serviços Externos
@@ -81,48 +80,48 @@ mente-ativa/
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── main.py              # Rotas e configuração FastAPI
-│   │   ├── database.py          # Conexão SQLAlchemy (uso legado)
+│   │   ├── main.py                      # Rotas e configuração FastAPI
 │   │   └── services/
-│   │       ├── firebase_auth.py     # Verificação de token Firebase
-│   │       ├── firebase_firestore.py # Cliente Firestore
-│   │       ├── llm_summary.py       # Resumo clínico (Gemini + fallback)
-│   │       └── test_results.py      # CRUD de resultados no Firestore
-│   ├── .env.sample              # Exemplo de variáveis de ambiente
-│   ├── .env.example             # Exemplo alternativo
-│   ├── Dockerfile               # Imagem Docker do backend
-│   ├── requirements.txt         # Dependências Python
-│   ├── service-account.json.sample  # Template da service account Firebase
-│   └── SETUP_FIREBASE.md        # Guia de configuração Firebase
+│   │       ├── __init__.py
+│   │       ├── firebase_auth.py         # Verificação de token Firebase
+│   │       ├── firebase_firestore.py    # Cliente Firestore
+│   │       ├── llm_summary.py           # Resumo clínico (Gemini + fallback)
+│   │       └── test_results.py          # CRUD de resultados no Firestore
+│   ├── .env.sample                      # Exemplo de variáveis de ambiente
+│   ├── .env.example                     # Exemplo alternativo
+│   ├── Dockerfile                       # Imagem Docker do backend
+│   ├── requirements.txt                 # Dependências Python
+│   ├── service-account.json.sample      # Template da service account Firebase
+│   └── SETUP_FIREBASE.md                # Guia de configuração Firebase
 │
 ├── frontend/
-│   ├── mente-ativa/             # Aplicação Vue 3
+│   ├── mente-ativa/                     # Aplicação Vue 3
 │   │   ├── src/
-│   │   │   ├── main.js              # Entry point
-│   │   │   ├── App.vue              # Componente raiz
-│   │   │   ├── style.css            # Estilos globais + Tailwind
+│   │   │   ├── main.js                  # Entry point
+│   │   │   ├── App.vue                  # Componente raiz
+│   │   │   ├── style.css                # Estilos globais + Tailwind
 │   │   │   ├── config/
-│   │   │   │   └── firebase.js      # Inicialização Firebase
+│   │   │   │   └── firebase.js          # Inicialização Firebase
 │   │   │   ├── router/
-│   │   │   │   └── index.js         # Rotas com guardas de autenticação
+│   │   │   │   └── index.js             # Rotas com guardas de autenticação
 │   │   │   ├── services/
-│   │   │   │   └── doctorLinks.js   # API de vínculo médico-paciente
-│   │   │   ├── views/               # Páginas da aplicação
-│   │   │   ├── components/          # Componentes reutilizáveis
-│   │   │   ├── composables/         # Composables Vue 3
-│   │   │   ├── stores/              # Gerenciamento de estado
-│   │   │   ├── utils/               # Utilitários
-│   │   │   └── data/                # Dados estáticos
-│   │   ├── .env.example             # Exemplo de variáveis do frontend
+│   │   │   │   └── doctorLinks.js       # API de vínculo médico-paciente
+│   │   │   ├── views/                   # Páginas da aplicação
+│   │   │   ├── components/              # Componentes reutilizáveis
+│   │   │   ├── composables/             # Composables Vue 3
+│   │   │   ├── stores/                  # Gerenciamento de estado
+│   │   │   ├── utils/                   # Utilitários
+│   │   │   └── data/                    # Dados estáticos
+│   │   ├── .env.example                 # Exemplo de variáveis do frontend
 │   │   ├── index.html
 │   │   ├── vite.config.js
 │   │   ├── postcss.config.js
 │   │   └── package.json
-│   ├── firebase.json            # Configuração Firebase Hosting
-│   ├── firestore.rules          # Regras de segurança Firestore
-│   └── firestore.indexes.json   # Índices compostos Firestore
+│   ├── firebase.json                    # Configuração Firebase Hosting
+│   ├── firestore.rules                  # Regras de segurança Firestore
+│   └── firestore.indexes.json           # Índices compostos Firestore
 │
-├── docker-compose.yml           # Orquestração dos serviços
+├── docker-compose.yml                   # Orquestração dos serviços
 ├── .gitignore
 └── README.md
 ```
@@ -140,32 +139,48 @@ cd mente-ativa
 
 ### 2. Configure as variáveis de ambiente
 
+**Windows (PowerShell):**
 ```powershell
 copy backend\.env.sample backend\.env
+```
+
+**Linux/Mac:**
+```bash
+cp backend/.env.sample backend/.env
 ```
 
 Edite `backend/.env` com suas credenciais:
 
 ```env
-DATABASE_URL=sqlite:///./mente_ativa.db
+FRONTEND_ORIGIN=http://localhost:5173
 FIREBASE_SERVICE_ACCOUNT_PATH=./service-account.json
 FIREBASE_PROJECT_ID=seu-project-id
 FIREBASE_API_KEY=sua-web-api-key
-FRONTEND_ORIGIN=http://localhost:5173
+
+# Google Gemini API para resumos clínicos por IA (opcional)
+# GEMINI_API_KEY=sua-chave-gemini
+# GEMINI_MODEL=gemini-2.5-flash
 ```
 
-> **Nota:** O `DATABASE_URL` com SQLite é usado apenas para login legado por email/senha. Todos os dados principais (testes, perfis, vínculos) são armazenados no **Firebase Firestore**.
+> **Nota:** Sem a chave Gemini, o sistema usa um resumo local conservador como fallback.
 
 ### 3. Crie e ative o virtualenv
 
+**Windows (PowerShell):**
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
+**Linux/Mac:**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
 ### 4. Instale as dependências
 
-```powershell
+```bash
 pip install -r backend/requirements.txt
 ```
 
@@ -179,20 +194,12 @@ Siga o guia detalhado em [backend/SETUP_FIREBASE.md](backend/SETUP_FIREBASE.md):
 
 ### 6. Inicie o servidor
 
-```powershell
+```bash
+cd backend
 python -m uvicorn app.main:app --reload --host localhost --port 8000
 ```
 
 Acesse a documentação interativa em: http://localhost:8000/docs
-
-### 7. (Opcional) Habilite resumo por LLM
-
-```powershell
-setx GEMINI_API_KEY "sua-chave-gemini"
-setx GEMINI_MODEL "gemini-2.5-flash"
-```
-
-Sem essa chave, o sistema usa um resumo local conservador como fallback.
 
 ---
 
@@ -206,19 +213,23 @@ cd frontend/mente-ativa
 
 ### 2. Configure as variáveis de ambiente
 
-Copie o arquivo de exemplo:
-
-```bash
+**Windows (PowerShell):**
+```powershell
 copy .env.example .env
+```
+
+**Linux/Mac:**
+```bash
+cp .env.example .env
 ```
 
 Edite `frontend/mente-ativa/.env` com as credenciais do seu projeto Firebase:
 
 ```env
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_API_KEY=sua-api-key
+VITE_FIREBASE_AUTH_DOMAIN=seu-projeto.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=seu-project-id
+VITE_FIREBASE_APP_ID=seu-app-id
 ```
 
 ### 3. Instale as dependências
@@ -259,12 +270,11 @@ Certifique-se de que o arquivo `backend/.env` esteja configurado antes de execut
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `DATABASE_URL` | ❌ | URL de conexão SQLite (apenas login legado por email/senha) |
+| `FRONTEND_ORIGIN` | ❌ | Origem permitida para CORS (padrão: `http://localhost:5173`) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | ✅* | Caminho para o JSON da service account |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | ✅* | Conteúdo da service account em JSON (alternativa ao path) |
 | `FIREBASE_PROJECT_ID` | ✅ | ID do projeto Firebase |
 | `FIREBASE_API_KEY` | ✅ | Web API Key do Firebase |
-| `FRONTEND_ORIGIN` | ❌ | Origem permitida para CORS (padrão: `http://localhost:5173`) |
 | `GEMINI_API_KEY` | ❌ | Chave da API Google Gemini (para resumo por IA) |
 | `GEMINI_MODEL` | ❌ | Modelo Gemini (padrão: `gemini-2.5-flash`) |
 
@@ -317,14 +327,12 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/` | Status da API |
-| `GET` | `/test_db` | Testa conexão com o banco local (SQLite legado) |
 | `GET` | `/firebase/status` | Status da conexão Firebase |
 
 ### Autenticação
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/login` | Login com e-mail e senha (SQLite legado) |
 | `POST` | `/auth/google` | Login com Google (token Firebase) |
 
 ### Testes Cognitivos (Firestore)
@@ -350,15 +358,6 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 | `POST` | `/doctor-links/patients/{uid}/diagnosis` | Médico salva diagnóstico textual |
 | `GET` | `/doctor-links/patients/{uid}/diagnosis` | Médico visualiza diagnóstico salvo |
 | `POST` | `/doctor-links/patients/{uid}/publish-summary` | Médico disponibiliza resumo para paciente |
-
-### Vínculos (SQLite Legado)
-
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/links` | Cria vínculo médico-paciente no SQLite |
-| `DELETE` | `/links` | Remove vínculo |
-| `GET` | `/links/doctor/{key}` | Lista pacientes de um médico |
-| `GET` | `/links/patient/{key}` | Lista médicos de um paciente |
 
 ---
 
@@ -397,10 +396,25 @@ Para configurar segredos no CI, utilize:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned; & .\.venv\Scripts\Activate.ps1; Set-Location backend; python -m uvicorn app.main:app --reload --host localhost --port 8000
 ```
 
+### Iniciar backend (Linux/Mac)
+
+```bash
+source .venv/bin/activate
+cd backend
+uvicorn app.main:app --reload --host localhost --port 8000
+```
+
 ### Iniciar frontend (PowerShell)
 
 ```powershell
 Set-Location frontend\mente-ativa; npm run dev -- --host localhost
+```
+
+### Iniciar frontend (Linux/Mac)
+
+```bash
+cd frontend/mente-ativa
+npm run dev -- --host localhost
 ```
 
 ### Build do frontend para produção
