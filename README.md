@@ -2,7 +2,7 @@
 
 Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos e médicos especialistas acompanham a evolução por meio de resumos clínicos gerados por IA.
 
-> **Monorepo** contendo backend (FastAPI + PostgreSQL + Firebase) e frontend (Vue 3 + Vite + Tailwind CSS).
+> **Monorepo** contendo backend (FastAPI + SQLite + Firebase) e frontend (Vue 3 + Vite + Tailwind CSS).
 
 ---
 
@@ -33,7 +33,7 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 | **FastAPI** | — | Framework web assíncrono |
 | **Uvicorn** | — | Servidor ASGI |
 | **SQLAlchemy** | — | ORM para banco relacional |
-| **PostgreSQL** (psycopg2-binary) | — | Banco de dados relacional |
+| **SQLite** | — | Banco de dados (desenvolvimento) |
 | **Pydantic** | — | Validação de schemas |
 | **python-dotenv** | — | Gerenciamento de variáveis de ambiente |
 | **Firebase Admin SDK** | — | Autenticação e Firestore |
@@ -50,7 +50,7 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 | **Axios** | ^1.13.6 | Cliente HTTP |
 | **Firebase JS SDK** | ^12.12.1 | Auth e Firestore no cliente |
 | **Tailwind CSS** | ^4.2.1 | Estilização utilitária |
-| **PostCSS / Autoprefixer** | — | Processamento CSS |
+| **PostCSS** | — | Processamento CSS |
 | **Node.js / npm** | 18+ | Runtime e gerenciador de pacotes |
 
 ### Serviços Externos
@@ -70,7 +70,6 @@ Plataforma para monitoramento cognitivo — pacientes realizam testes cognitivos
 
 - **Python 3.11+**
 - **Node.js 18+** e **npm**
-- **PostgreSQL** (rodando localmente ou via Docker)
 - **Conta Firebase** com Authentication e Firestore ativados
 - **Docker** e **Docker Compose** (opcional, para ambiente conteinerizado)
 
@@ -84,7 +83,7 @@ mente-ativa/
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py              # Rotas e configuração FastAPI
-│   │   ├── database.py          # Conexão SQLAlchemy + PostgreSQL
+│   │   ├── database.py          # Conexão SQLAlchemy + SQLite
 │   │   └── services/
 │   │       ├── firebase_auth.py     # Verificação de token Firebase
 │   │       ├── firebase_firestore.py # Cliente Firestore
@@ -149,33 +148,27 @@ copy backend\.env.sample backend\.env
 Edite `backend/.env` com suas credenciais:
 
 ```env
-DATABASE_URL=postgresql://usuario:senha@localhost:5432/mente_ativa
+DATABASE_URL=sqlite:///./mente_ativa.db
 FIREBASE_SERVICE_ACCOUNT_PATH=./service-account.json
 FIREBASE_PROJECT_ID=seu-project-id
 FIREBASE_API_KEY=sua-web-api-key
 FRONTEND_ORIGIN=http://localhost:5173
 ```
 
-### 3. Crie o banco PostgreSQL
-
-```sql
-CREATE DATABASE mente_ativa;
-```
-
-### 4. Crie e ative o virtualenv
+### 3. Crie e ative o virtualenv
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 5. Instale as dependências
+### 4. Instale as dependências
 
 ```powershell
 pip install -r backend/requirements.txt
 ```
 
-### 6. Configure o Firebase
+### 5. Configure o Firebase
 
 Siga o guia detalhado em [backend/SETUP_FIREBASE.md](backend/SETUP_FIREBASE.md):
 
@@ -183,7 +176,7 @@ Siga o guia detalhado em [backend/SETUP_FIREBASE.md](backend/SETUP_FIREBASE.md):
 2. Gere uma nova chave privada e salve como `backend/service-account.json`
 3. Configure as variáveis `FIREBASE_PROJECT_ID` e `FIREBASE_API_KEY` no `.env`
 
-### 7. Inicie o servidor
+### 6. Inicie o servidor
 
 ```powershell
 python -m uvicorn app.main:app --reload --host localhost --port 8000
@@ -191,7 +184,7 @@ python -m uvicorn app.main:app --reload --host localhost --port 8000
 
 Acesse a documentação interativa em: http://localhost:8000/docs
 
-### 8. (Opcional) Habilite resumo por LLM
+### 7. (Opcional) Habilite resumo por LLM
 
 ```powershell
 setx GEMINI_API_KEY "sua-chave-gemini"
@@ -224,10 +217,7 @@ Edite `frontend/mente-ativa/.env` com as credenciais do seu projeto Firebase:
 VITE_FIREBASE_API_KEY=...
 VITE_FIREBASE_AUTH_DOMAIN=...
 VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
 ```
 
 ### 3. Instale as dependências
@@ -268,7 +258,7 @@ Certifique-se de que o arquivo `backend/.env` esteja configurado antes de execut
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `DATABASE_URL` | ✅ | URL de conexão PostgreSQL |
+| `DATABASE_URL` | ✅ | URL de conexão do banco (SQLite ou PostgreSQL) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | ✅* | Caminho para o JSON da service account |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | ✅* | Conteúdo da service account em JSON (alternativa ao path) |
 | `FIREBASE_PROJECT_ID` | ✅ | ID do projeto Firebase |
@@ -286,10 +276,7 @@ Certifique-se de que o arquivo `backend/.env` esteja configurado antes de execut
 | `VITE_FIREBASE_API_KEY` | ✅ | Web API Key do Firebase |
 | `VITE_FIREBASE_AUTH_DOMAIN` | ✅ | Auth domain do Firebase |
 | `VITE_FIREBASE_PROJECT_ID` | ✅ | ID do projeto Firebase |
-| `VITE_FIREBASE_STORAGE_BUCKET` | ✅ | Storage bucket do Firebase |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | ✅ | Sender ID do Firebase |
 | `VITE_FIREBASE_APP_ID` | ✅ | App ID do Firebase |
-| `VITE_FIREBASE_MEASUREMENT_ID` | ❌ | Measurement ID (Google Analytics) |
 
 ---
 
@@ -328,7 +315,7 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/` | Status da API |
-| `GET` | `/test_db` | Testa conexão com PostgreSQL |
+| `GET` | `/test_db` | Testa conexão com o banco de dados |
 | `GET` | `/firebase/status` | Status da conexão Firebase |
 
 ### Autenticação
@@ -362,7 +349,7 @@ As regras do Firestore (`frontend/firestore.rules`) garantem que:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/links` | Cria vínculo médico-paciente no PostgreSQL |
+| `POST` | `/links` | Cria vínculo médico-paciente no banco local |
 | `DELETE` | `/links` | Remove vínculo |
 | `GET` | `/links/doctor/{key}` | Lista pacientes de um médico |
 | `GET` | `/links/patient/{key}` | Lista médicos de um paciente |
